@@ -4,52 +4,11 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createOpencodeClient } from "@opencode-ai/sdk"
+import { detectAiPatterns, detectBannedWords, detectEmDashes, detectFillerPhrases, detectRuleOfThree } from "opencode-text-tools"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(__dirname, "..")
 const OPENCODE_URL = process.env.OPENCODE_URL ?? "http://127.0.0.1:4098"
-const AI_PATTERNS = [
-  "additionally",
-  "align with",
-  "crucial",
-  "delve",
-  "emphasizing",
-  "enduring",
-  "enhance",
-  "fostering",
-  "garner",
-  "highlight",
-  "interplay",
-  "intricate",
-  "intricacies",
-  "key role",
-  "landscape",
-  "pivotal",
-  "showcase",
-  "tapestry",
-  "testament",
-  "underscore",
-  "valuable",
-  "vibrant",
-  "game-changing",
-  "nestled",
-  "groundbreaking",
-  "renowned",
-  "breathtaking",
-  "must-visit",
-  "cutting-edge",
-]
-const BANNED_WORDS = ["delve", "tapestry", "leverage", "game-changer", "cutting-edge", "robust", "innovative"]
-const FILLER_PHRASES = [
-  "in order to",
-  "due to the fact that",
-  "at this point in time",
-  "in the event that",
-  "has the ability to",
-  "it is important to note that",
-  "i hope this helps",
-  "let me know if",
-]
 
 function usage() {
   console.log(`Usage:
@@ -79,17 +38,6 @@ function readInput(inputPath) {
   return readFileSync(join(repoRoot, inputPath), "utf8").trim()
 }
 
-function countOccurrences(text, needle) {
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const matches = text.match(new RegExp(`\\b${escaped}\\b`, "gi"))
-  return matches?.length ?? 0
-}
-
-function countRuleOfThree(text) {
-  const matches = text.match(/\b[^,.\n]+,\s+[^,.\n]+,\s+(?:and|or)\s+[^,.\n]+/gi)
-  return matches?.length ?? 0
-}
-
 function mapScore({ aiPatterns, bannedWords, fillerPhrases, emDashes, ruleOfThree }) {
   const severity = aiPatterns + bannedWords + fillerPhrases + emDashes + ruleOfThree
   if (aiPatterns >= 10 || bannedWords >= 4 || severity >= 12) return 0
@@ -101,12 +49,17 @@ function mapScore({ aiPatterns, bannedWords, fillerPhrases, emDashes, ruleOfThre
 }
 
 export function scanText(text) {
-  const lower = text.toLowerCase()
-  const aiMatches = AI_PATTERNS.filter((pattern) => countOccurrences(lower, pattern) > 0)
-  const bannedMatches = BANNED_WORDS.filter((word) => countOccurrences(lower, word) > 0)
-  const fillerMatches = FILLER_PHRASES.filter((phrase) => countOccurrences(lower, phrase) > 0)
-  const emDashes = (text.match(/—/g) ?? []).length
-  const ruleOfThree = countRuleOfThree(text)
+  const aiScan = detectAiPatterns(text)
+  const bannedScan = detectBannedWords(text)
+  const fillerScan = detectFillerPhrases(text)
+  const emDashScan = detectEmDashes(text)
+  const ruleOfThreeScan = detectRuleOfThree(text)
+
+  const aiMatches = Object.keys(aiScan.counts.byPattern)
+  const bannedMatches = bannedScan.found
+  const fillerMatches = [...new Set(fillerScan.map((match) => match.matchedText.toLowerCase()))]
+  const emDashes = emDashScan.count
+  const ruleOfThree = ruleOfThreeScan.length
   const score = mapScore({
     aiPatterns: aiMatches.length,
     bannedWords: bannedMatches.length,

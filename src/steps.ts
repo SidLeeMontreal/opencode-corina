@@ -4,6 +4,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { ResolvedModel } from "opencode-model-resolver"
+import { detectBannedWords, wordCount } from "opencode-text-tools"
 
 import type {
   AuditArtifact,
@@ -15,7 +16,6 @@ import type {
   StepResult,
 } from "./types.js"
 
-const DEFAULT_BANNED_WORDS = ["delve", "tapestry", "leverage", "game-changer", "cutting-edge", "robust", "innovative"]
 const PROMPTS_DIR = join(homedir(), ".config", "opencode", "prompts")
 const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas")
 
@@ -23,12 +23,11 @@ const promptCache = new Map<string, string>()
 const schemaCache = new Map<string, Record<string, unknown>>()
 
 export function sanitizeWords(text: string): string[] {
-  const haystack = text.toLowerCase()
-  return DEFAULT_BANNED_WORDS.filter((word) => haystack.includes(word.toLowerCase()))
+  return detectBannedWords(text).found
 }
 
 export function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length
+  return wordCount(text).total_words
 }
 
 function loadPrompt(filename: string): string {
