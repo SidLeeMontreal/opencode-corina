@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CritiqueArtifact",
+  "type": "object",
+  "required": ["pass", "overall_score", "dimensions", "revision_instructions", "fatal_issues"],
+  "properties": {
+    "pass": { "type": "boolean" },
+    "overall_score": { "type": "number", "minimum": 0, "maximum": 25 },
+    "dimensions": {
+      "type": "object",
+      "required": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"],
+      "properties": {
+        "ai_patterns": {
+          "type": "object",
+          "required": ["score", "issues"],
+          "properties": {
+            "score": { "type": "number", "minimum": 1, "maximum": 5 },
+            "issues": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "corina_tone": {
+          "type": "object",
+          "required": ["score", "issues"],
+          "properties": {
+            "score": { "type": "number", "minimum": 1, "maximum": 5 },
+            "issues": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "precision": {
+          "type": "object",
+          "required": ["score", "issues"],
+          "properties": {
+            "score": { "type": "number", "minimum": 1, "maximum": 5 },
+            "issues": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "required": ["score", "issues"],
+          "properties": {
+            "score": { "type": "number", "minimum": 1, "maximum": 5 },
+            "issues": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "rhythm": {
+          "type": "object",
+          "required": ["score", "issues"],
+          "properties": {
+            "score": { "type": "number", "minimum": 1, "maximum": 5 },
+            "issues": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "revision_instructions": { "type": "array", "items": { "type": "string" } },
+    "fatal_issues": { "type": "array", "items": { "type": "string" } }
+  }
+}

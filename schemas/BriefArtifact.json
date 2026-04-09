@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BriefArtifact",
+  "type": "object",
+  "required": ["objective", "audience", "tone", "format", "constraints", "missing_info", "success_rubric"],
+  "properties": {
+    "objective": { "type": "string", "minLength": 10 },
+    "audience": { "type": "string", "minLength": 5 },
+    "tone": { "type": "string", "enum": ["analytical", "conversational", "authoritative", "narrative"] },
+    "format": { "type": "string", "enum": ["article", "white paper", "slide", "social", "email", "other"] },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "missing_info": { "type": "array", "items": { "type": "string" } },
+    "success_rubric": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+  }
+}

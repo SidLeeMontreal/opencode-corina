@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuditArtifact",
+  "type": "object",
+  "required": ["approved_for_delivery", "ai_patterns_remaining", "banned_words_remaining", "style_violations", "publishability_note"],
+  "properties": {
+    "approved_for_delivery": { "type": "boolean" },
+    "ai_patterns_remaining": { "type": "array", "items": { "type": "string" } },
+    "banned_words_remaining": { "type": "array", "items": { "type": "string" } },
+    "style_violations": { "type": "array", "items": { "type": "string" } },
+    "publishability_note": { "type": "string", "minLength": 5 },
+    "final_content": { "type": ["string", "null"] }
+  }
+}

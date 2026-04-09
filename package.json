@@ -1,0 +1,29 @@
+{
+  "name": "opencode-corina",
+  "version": "0.1.0",
+  "description": "Corina writing agent for OpenCode — gated 5-step editorial pipeline",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.4.1",
+    "@opencode-ai/sdk": "^1.4.1",
+    "ajv": "^8.17.1",
+    "opencode-model-resolver": "file:../opencode-model-resolver"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "writing",
+    "corina"
+  ],
+  "license": "MIT"
+}
