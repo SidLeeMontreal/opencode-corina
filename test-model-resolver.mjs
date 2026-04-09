@@ -6,11 +6,9 @@ const provider = "github-copilot";
 const models = await resolver.fetchModels(provider);
 console.log(`Fetched ${Object.keys(models).length} models for ${provider}`);
 
-const quality = await resolver.resolveStepModel({ preset: "quality" }, provider);
-console.log(`quality -> ${quality.modelID}`);
-
-const fast = await resolver.resolveStepModel({ preset: "fast" }, provider);
-console.log(`fast -> ${fast.modelID}`);
-
-const sonnet = await resolver.resolveStepModel({ family: "claude-sonnet" }, provider);
-console.log(`claude-sonnet -> ${sonnet.modelID}`);
+const presets = ["quality", "fast", "writing-quality", "writing-analysis", "writing-fast", "claude-sonnet"];
+for (const p of presets) {
+  const config = p.startsWith("claude") ? { family: p } : { preset: p };
+  const resolved = await resolver.resolveStepModel(config, "github-copilot");
+  console.log(`${p.padEnd(20)} -> ${resolved.modelID}`);
+}
