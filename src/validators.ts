@@ -24,6 +24,11 @@ const validators = {
   DraftArtifact: ajv.compile(loadSchema("DraftArtifact.json")),
   CritiqueArtifact: ajv.compile(loadSchema("CritiqueArtifact.json")),
   AuditArtifact: ajv.compile(loadSchema("AuditArtifact.json")),
+  ToneInputArtifact: ajv.compile(loadSchema("ToneInputArtifact.json")),
+  ToneOutputArtifact: ajv.compile(loadSchema("ToneOutputArtifact.json")),
+  ToneValidationArtifact: ajv.compile(loadSchema("ToneValidationArtifact.json")),
+  PersonalVoiceProfile: ajv.compile(loadSchema("PersonalVoiceProfile.json")),
+  BrandProfile: ajv.compile(loadSchema("BrandProfile.json")),
 } as const;
 
 export type SchemaName = keyof typeof validators;

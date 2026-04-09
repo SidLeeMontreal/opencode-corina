@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToneOutputArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rewritten_content",
+    "final_content",
+    "voice_applied",
+    "format_applied",
+    "changes_summary",
+    "humanizer_score",
+    "validator_notes",
+    "assumptions",
+    "validation_score"
+  ],
+  "properties": {
+    "rewritten_content": {
+      "type": "string",
+      "minLength": 1
+    },
+    "final_content": {
+      "type": "string",
+      "minLength": 1
+    },
+    "voice_applied": {
+      "type": "string",
+      "enum": [
+        "journalist",
+        "technical",
+        "persuasive",
+        "social",
+        "ux",
+        "seo",
+        "accessibility",
+        "executive",
+        "brand",
+        "email",
+        "personal"
+      ]
+    },
+    "format_applied": {
+      "type": "string",
+      "enum": ["article", "social", "slide", "email", "brief", "other"]
+    },
+    "changes_summary": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Short list of structural and stylistic changes made."
+    },
+    "humanizer_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "remaining_flags"],
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Heuristic score where higher means fewer AI-pattern indicators remain."
+        },
+        "remaining_flags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "preservation_check": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "meaning_preserved": { "type": "boolean" },
+        "flagged_drift": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "validator_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "validation_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    }
+  }
+}

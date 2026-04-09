@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BrandProfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "voice_statement",
+    "core_rules",
+    "banned_words",
+    "banned_phrases",
+    "tone_adjectives",
+    "sample_approved",
+    "sample_rejected"
+  ],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "voice_statement": { "type": "string", "minLength": 1 },
+    "core_rules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "banned_words": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "banned_phrases": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "tone_adjectives": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "sample_approved": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "sample_rejected": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    }
+  }
+}

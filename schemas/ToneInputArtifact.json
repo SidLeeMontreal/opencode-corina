@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToneInputArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["original_text", "voice", "format"],
+  "properties": {
+    "original_text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Normalized source text to rewrite."
+    },
+    "source_path": {
+      "type": ["string", "null"],
+      "description": "Optional original file path if the input came from disk."
+    },
+    "voice": {
+      "type": "string",
+      "enum": [
+        "journalist",
+        "technical",
+        "persuasive",
+        "social",
+        "ux",
+        "seo",
+        "accessibility",
+        "executive",
+        "brand",
+        "email",
+        "personal"
+      ]
+    },
+    "format": {
+      "type": "string",
+      "enum": ["article", "social", "slide", "email", "brief", "other"]
+    },
+    "audience": {
+      "type": ["string", "null"],
+      "description": "Optional audience hint for terminology and framing."
+    },
+    "brand_profile": {
+      "type": ["object", "null"],
+      "description": "Resolved brand profile object when voice=brand."
+    },
+    "tone_description": {
+      "type": ["string", "null"],
+      "description": "Raw freeform personal tone description from --tone-desc or --tone-file when voice=personal."
+    },
+    "personal_tone_profile": {
+      "type": ["object", "null"],
+      "description": "Structured extraction from tone_description when voice=personal.",
+      "additionalProperties": false,
+      "properties": {
+        "sentence_length": {
+          "type": "string",
+          "enum": ["short", "varied", "long", "unspecified"]
+        },
+        "vocabulary_register": {
+          "type": "string",
+          "enum": ["casual", "professional", "technical", "mixed", "unspecified"]
+        },
+        "personality_markers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "avoid": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "explicit_style_rules": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "preservation_instructions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional explicit constraints such as preserve headings, preserve examples, or do not shorten."
+    },
+    "detected_source_format": {
+      "type": ["string", "null"],
+      "description": "Best-effort format inference from normalization stage."
+    },
+    "source_metrics": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "character_count": { "type": "integer", "minimum": 0 },
+        "word_count": { "type": "integer", "minimum": 0 },
+        "paragraph_count": { "type": "integer", "minimum": 0 },
+        "heading_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "voice": { "const": "brand" } },
+        "required": ["voice"]
+      },
+      "then": {
+        "required": ["brand_profile"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "voice": { "const": "personal" } },
+        "required": ["voice"]
+      },
+      "then": {
+        "required": ["tone_description", "personal_tone_profile"]
+      }
+    }
+  ]
+}

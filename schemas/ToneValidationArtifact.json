@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToneValidationArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pass",
+    "validation_score",
+    "voice_checks",
+    "preservation_checks",
+    "entity_gaps",
+    "ai_patterns_found",
+    "format_match",
+    "validator_notes",
+    "correction_instructions"
+  ],
+  "properties": {
+    "pass": { "type": "boolean" },
+    "validation_score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "voice_checks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "preservation_checks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "entity_gaps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "ai_patterns_found": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "format_match": { "type": "boolean" },
+    "validator_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "correction_instructions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

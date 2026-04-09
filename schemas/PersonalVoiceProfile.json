@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PersonalVoiceProfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sentence_length",
+    "vocabulary_register",
+    "personality_markers",
+    "avoid",
+    "explicit_style_rules"
+  ],
+  "properties": {
+    "sentence_length": {
+      "type": "string",
+      "enum": ["short", "varied", "long", "unspecified"]
+    },
+    "vocabulary_register": {
+      "type": "string",
+      "enum": ["casual", "professional", "technical", "mixed", "unspecified"]
+    },
+    "personality_markers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "avoid": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "explicit_style_rules": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -23,6 +23,11 @@ export function createMockClient(responses: unknown[] = []) {
         }
 
         sessions.get(id)!.prompts.push(body)
+
+        if (body.noReply) {
+          return { data: { parts: [] } }
+        }
+
         const next = responses.shift()
         return next ?? { data: { parts: [{ type: "text", text: "## FINAL\nMock response" }] } }
       },

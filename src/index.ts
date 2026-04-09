@@ -4,6 +4,7 @@ import type { StepModelConfig } from "opencode-model-resolver";
 
 import { writeAuditLog } from "./audit-log.js";
 import { runPipeline } from "./pipeline.js";
+import { runTonePipeline } from "./tone-pipeline.js";
 import type { PipelineModelConfig } from "./types.js";
 
 function buildUniformModelConfig(modelPreset?: "fast" | "balanced" | "quality"): Partial<PipelineModelConfig> | undefined {
@@ -49,6 +50,37 @@ export const CorinaPlugin: Plugin = async (input) => {
             },
           });
           return output;
+        },
+      }),
+      corina_tone: tool({
+        description:
+          "Rewrite content in a specified voice and format using Corina. Supports 11 voices: journalist, technical, persuasive, social, ux, seo, accessibility, executive, brand, email, personal. All params optional — Corina infers missing ones.",
+        args: {
+          text: tool.schema.string().min(1),
+          voice: tool.schema.string().optional(),
+          format: tool.schema.string().optional(),
+          audience: tool.schema.string().optional(),
+          toneDesc: tool.schema.string().optional(),
+          toneFile: tool.schema.string().optional(),
+          profile: tool.schema.string().optional(),
+          modelPreset: tool.schema.string().optional(),
+        },
+        execute: async (args, toolCtx) => {
+          const output = await runTonePipeline(args, input.client);
+          writeAuditLog({
+            timestamp: new Date().toISOString(),
+            event: "corina_tone",
+            sessionId: toolCtx.sessionID,
+            briefPreview: args.text.slice(0, 160),
+            outcome: "completed",
+            metadata: {
+              voice: args.voice,
+              format: args.format,
+              modelPreset: args.modelPreset,
+              validationScore: output.validation_score,
+            },
+          });
+          return output.final_content;
         },
       }),
     },
