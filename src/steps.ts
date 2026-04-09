@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs"
+import { homedir } from "node:os"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
-import type { ResolvedModel } from "opencode-model-resolver";
+import type { ResolvedModel } from "opencode-model-resolver"
 
 import type {
   AuditArtifact,
@@ -13,52 +13,52 @@ import type {
   OpenCodeClient,
   OutlineArtifact,
   StepResult,
-} from "./types.js";
+} from "./types.js"
 
-const DEFAULT_BANNED_WORDS = ["delve", "tapestry", "leverage", "game-changer", "cutting-edge", "robust"];
-const PROMPTS_DIR = join(homedir(), ".config", "opencode", "prompts");
-const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas");
+const DEFAULT_BANNED_WORDS = ["delve", "tapestry", "leverage", "game-changer", "cutting-edge", "robust", "innovative"]
+const PROMPTS_DIR = join(homedir(), ".config", "opencode", "prompts")
+const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas")
 
-const promptCache = new Map<string, string>();
-const schemaCache = new Map<string, Record<string, unknown>>();
+const promptCache = new Map<string, string>()
+const schemaCache = new Map<string, Record<string, unknown>>()
 
-function sanitizeWords(text: string): string[] {
-  const haystack = text.toLowerCase();
-  return DEFAULT_BANNED_WORDS.filter((word) => haystack.includes(word.toLowerCase()));
+export function sanitizeWords(text: string): string[] {
+  const haystack = text.toLowerCase()
+  return DEFAULT_BANNED_WORDS.filter((word) => haystack.includes(word.toLowerCase()))
 }
 
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length
 }
 
 function loadPrompt(filename: string): string {
-  const cached = promptCache.get(filename);
+  const cached = promptCache.get(filename)
   if (cached) {
-    return cached;
+    return cached
   }
 
-  const content = readFileSync(join(PROMPTS_DIR, filename), "utf8").trim();
-  promptCache.set(filename, content);
-  return content;
+  const content = readFileSync(join(PROMPTS_DIR, filename), "utf8").trim()
+  promptCache.set(filename, content)
+  return content
 }
 
 function loadSchema(filename: string): Record<string, unknown> {
-  const cached = schemaCache.get(filename);
+  const cached = schemaCache.get(filename)
   if (cached) {
-    return cached;
+    return cached
   }
 
-  const schema = JSON.parse(readFileSync(join(SCHEMAS_DIR, filename), "utf8")) as Record<string, unknown>;
-  schemaCache.set(filename, schema);
-  return schema;
+  const schema = JSON.parse(readFileSync(join(SCHEMAS_DIR, filename), "utf8")) as Record<string, unknown>
+  schemaCache.set(filename, schema)
+  return schema
 }
 
 function unwrapData<T>(response: unknown): T {
   if (typeof response === "object" && response !== null && "data" in response) {
-    return (response as { data: T }).data;
+    return (response as { data: T }).data
   }
 
-  return response as T;
+  return response as T
 }
 
 function buildPromptBody(body: Record<string, unknown>, model?: ResolvedModel): Record<string, unknown> {
@@ -70,7 +70,7 @@ function buildPromptBody(body: Record<string, unknown>, model?: ResolvedModel): 
         }
       : undefined,
     ...body,
-  };
+  }
 }
 
 async function promptSession(
@@ -80,47 +80,47 @@ async function promptSession(
   model?: ResolvedModel,
 ): Promise<any> {
   const sessionClient = client.session as unknown as {
-    prompt: (options: Record<string, unknown>) => Promise<any>;
-  };
+    prompt: (options: Record<string, unknown>) => Promise<any>
+  }
 
   try {
     return await sessionClient.prompt({
       path: { id: sessionId },
       body: buildPromptBody(body, model),
-    });
+    })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error)
     if (!message.includes("sessionID") && !message.includes("id")) {
-      throw error;
+      throw error
     }
 
     return sessionClient.prompt({
       path: { sessionID: sessionId },
       body: buildPromptBody(body, model),
-    });
+    })
   }
 }
 
 async function deleteSession(client: OpenCodeClient, sessionId: string): Promise<void> {
   const sessionClient = client.session as unknown as {
-    delete: (options: Record<string, unknown>) => Promise<any>;
-  };
+    delete: (options: Record<string, unknown>) => Promise<any>
+  }
 
   try {
-    await sessionClient.delete({ path: { id: sessionId } });
+    await sessionClient.delete({ path: { id: sessionId } })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error)
     if (!message.includes("sessionID") && !message.includes("id")) {
-      throw error;
+      throw error
     }
 
-    await sessionClient.delete({ path: { sessionID: sessionId } });
+    await sessionClient.delete({ path: { sessionID: sessionId } })
   }
 }
 
-function extractText(parts: unknown): string {
+export function extractText(parts: unknown): string {
   if (!Array.isArray(parts)) {
-    return "";
+    return ""
   }
 
   return parts
@@ -128,11 +128,11 @@ function extractText(parts: unknown): string {
     .filter((part) => part.type === "text" && typeof part.text === "string")
     .map((part) => part.text)
     .join("\n")
-    .trim();
+    .trim()
 }
 
-function parseStructuredOutput<T>(result: unknown): T {
-  const data = unwrapData<any>(result);
+export function parseStructuredOutput<T>(result: unknown): T {
+  const data = unwrapData<any>(result)
   const candidates = [
     data?.info?.structured,
     data?.info?.structured_output,
@@ -140,44 +140,44 @@ function parseStructuredOutput<T>(result: unknown): T {
     data?.info?.metadata?.structured_output,
     data?.structured_output,
     data?.structuredOutput,
-  ];
+  ]
 
   for (const candidate of candidates) {
     if (candidate && typeof candidate === "object") {
-      return candidate as T;
+      return candidate as T
     }
   }
 
-  const text = extractText(data?.parts);
+  const text = extractText(data?.parts)
   if (!text) {
-    throw new Error("Structured response did not include structured_output or JSON text parts.");
+    throw new Error("Structured response did not include structured_output or JSON text parts.")
   }
 
-  return JSON.parse(text) as T;
+  return JSON.parse(text) as T
 }
 
-function extractFinalText(responseText: string): string {
-  const finalHeader = /^## FINAL\s*$/im;
+export function extractFinalText(responseText: string): string {
+  const finalHeader = /^## FINAL\s*$/im
   if (!finalHeader.test(responseText)) {
-    return responseText.trim();
+    return responseText.trim()
   }
 
-  const segments = responseText.split(finalHeader);
-  return (segments.at(-1) ?? responseText).trim();
+  const segments = responseText.split(finalHeader)
+  return (segments.at(-1) ?? responseText).trim()
 }
 
 async function runSession<T>(input: {
-  client: OpenCodeClient;
-  title: string;
-  agent: string;
-  personaFile: string;
-  taskPrompt: string;
-  schemaFile?: string;
-  model?: ResolvedModel;
+  client: OpenCodeClient
+  title: string
+  agent: string
+  personaFile: string
+  taskPrompt: string
+  schemaFile?: string
+  model?: ResolvedModel
 }): Promise<T> {
-  const { client, title, agent, personaFile, taskPrompt, schemaFile, model } = input;
-  const sessionResponse = await client.session.create({ body: { title } });
-  const session = unwrapData<{ id: string }>(sessionResponse);
+  const { client, title, agent, personaFile, taskPrompt, schemaFile, model } = input
+  const sessionResponse = await client.session.create({ body: { title } })
+  const session = unwrapData<{ id: string }>(sessionResponse)
 
   try {
     await promptSession(
@@ -189,7 +189,7 @@ async function runSession<T>(input: {
         parts: [{ type: "text", text: loadPrompt(personaFile) }],
       },
       model,
-    );
+    )
 
     const result = await promptSession(
       client,
@@ -208,16 +208,16 @@ async function runSession<T>(input: {
           : {}),
       },
       model,
-    );
+    )
 
     if (schemaFile) {
-      return parseStructuredOutput<T>(result);
+      return parseStructuredOutput<T>(result)
     }
 
-    const text = extractText(unwrapData<any>(result)?.parts);
-    return extractFinalText(text) as T;
+    const text = extractText(unwrapData<any>(result)?.parts)
+    return extractFinalText(text) as T
   } finally {
-    await deleteSession(client, session.id);
+    await deleteSession(client, session.id)
   }
 }
 
@@ -242,9 +242,9 @@ export async function runBriefIntake(
       "RAW BRIEF:",
       rawBrief.trim(),
     ].join("\n"),
-  });
+  })
 
-  return { artifact };
+  return { artifact }
 }
 
 export async function runOutline(
@@ -267,9 +267,9 @@ export async function runOutline(
       "BRIEF ARTIFACT:",
       JSON.stringify(brief, null, 2),
     ].join("\n"),
-  });
+  })
 
-  return { artifact };
+  return { artifact }
 }
 
 export async function runDraft(
@@ -296,9 +296,9 @@ export async function runDraft(
       "OUTLINE ARTIFACT:",
       JSON.stringify(outline, null, 2),
     ].join("\n"),
-  });
+  })
 
-  const bannedWords = sanitizeWords(content);
+  const bannedWords = sanitizeWords(content)
 
   return {
     artifact: {
@@ -309,7 +309,7 @@ export async function runDraft(
       open_risks: outline.risks,
     },
     warnings: bannedWords.length ? [`Banned words detected in draft pre-scan: ${bannedWords.join(", ")}`] : [],
-  };
+  }
 }
 
 export async function runCritique(
@@ -336,9 +336,9 @@ export async function runCritique(
       "DRAFT ARTIFACT:",
       JSON.stringify(draft, null, 2),
     ].join("\n"),
-  });
+  })
 
-  return { artifact };
+  return { artifact }
 }
 
 export async function runRevise(
@@ -365,7 +365,7 @@ export async function runRevise(
       "CRITIQUE ARTIFACT:",
       JSON.stringify(critique, null, 2),
     ].join("\n"),
-  });
+  })
 
   return {
     artifact: {
@@ -373,7 +373,7 @@ export async function runRevise(
       content,
       word_count: countWords(content),
     },
-  };
+  }
 }
 
 export async function runAudit(
@@ -400,10 +400,10 @@ export async function runAudit(
       "DRAFT ARTIFACT:",
       JSON.stringify(draft, null, 2),
     ].join("\n"),
-  });
+  })
 
-  const bannedWords = sanitizeWords(draft.content);
-  const warnings = bannedWords.length ? [`Local banned-word scan still sees: ${bannedWords.join(", ")}`] : [];
+  const bannedWords = sanitizeWords(draft.content)
+  const warnings = bannedWords.length ? [`Local banned-word scan still sees: ${bannedWords.join(", ")}`] : []
 
-  return { artifact, warnings };
+  return { artifact, warnings }
 }

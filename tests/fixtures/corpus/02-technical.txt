@@ -1,0 +1,1 @@
+The platform exposes a REST API for content ingestion, normalizes payloads into a JSON schema, and stores versioned revisions for rollback. Teams can authenticate with scoped tokens, stream events over webhooks, and query audit history for each document state.
