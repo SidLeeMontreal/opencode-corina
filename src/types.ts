@@ -408,6 +408,61 @@ export interface StepResult<T> {
   retrySuggested?: boolean;
 }
 
+export interface HeatMapEntry {
+  tag: string;
+  severity: "Minor" | "Moderate" | "Major";
+  count: number;
+}
+
+export interface RevisionLogEntry {
+  id: string;
+  original_excerpt: string;
+  tags: string[];
+  solution_move: string;
+  new_text: string;
+  scope: "Target" | "Previous bridge" | "Next bridge";
+}
+
+export interface PreservationCheck {
+  facts: boolean;
+  nuance: boolean;
+  argument_function: boolean;
+  evidence: boolean;
+  tone_voice: boolean;
+  chronology: boolean;
+  notes?: string;
+}
+
+export interface ReconciliationEntry {
+  id: string;
+  location: string;
+  issue_type: string;
+  what_changed: string;
+  reason: string;
+}
+
+export interface ParagraphFunctionEntry {
+  paragraph: string;
+  function: string;
+  compression_priority: "High" | "Medium" | "Low" | "None";
+  revision_risk: "Low risk" | "Medium risk" | "High risk";
+  preservation_constraints: string;
+}
+
+export interface ConciseArtifact {
+  mode: "quick" | "full";
+  original_word_count: number;
+  revised_word_count: number;
+  compression_ratio: number;
+  revised_draft: string;
+  heat_map: HeatMapEntry[];
+  revision_log: RevisionLogEntry[];
+  preservation_check: PreservationCheck;
+  unresolved_issues: string[];
+  reconciliation_log?: ReconciliationEntry[];
+  paragraph_function_map?: ParagraphFunctionEntry[];
+}
+
 export interface AuditLogEntry {
   timestamp: string;
   event: "capability_complete" | "session_idle" | "chain_complete";

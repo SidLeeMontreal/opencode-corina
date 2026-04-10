@@ -35,6 +35,7 @@ const validators = {
   BrandProfile: ajv.compile(loadSchema("BrandProfile.json")),
   Layer2Analysis: ajv.compile(loadSchema("Layer2Analysis.json")),
   DetectionReport: ajv.compile(loadSchema("DetectionReport.json")),
+  ConciseArtifact: ajv.compile(loadSchema("ConciseArtifact.json")),
 } as const;
 
 export type SchemaName = keyof typeof validators;

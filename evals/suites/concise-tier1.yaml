@@ -1,0 +1,62 @@
+- id: concise-never-fail-short
+  capability: concise
+  input:
+    text: "Hello."
+    mode: "quick"
+    candidate: "Hello."
+  expect:
+    schema_valid: true
+    output_present: true
+    no_fabrication: true
+
+- id: concise-never-fail-empty-ish
+  capability: concise
+  input:
+    text: "The report is good."
+    mode: "quick"
+    candidate: "The report is good."
+  expect:
+    schema_valid: true
+    output_present: true
+
+- id: concise-quick-mode-padded
+  capability: concise
+  input:
+    text: "In today's rapidly evolving world, it is absolutely essential that we carefully consider and take into account all of the various different factors that may potentially impact our ability to make truly informed and well-considered decisions about the future direction of our organization."
+    mode: "quick"
+    candidate: "We need to consider the factors that could affect our organization's future so we can make informed decisions."
+  expect:
+    schema_valid: true
+    output_present: true
+    word_count_reduced: true
+
+- id: concise-json-format
+  capability: concise
+  input:
+    text: "This is a test sentence that contains some redundant and repetitive words and phrases that could be made more concise."
+    mode: "quick"
+    format: "json"
+    candidate: '{"agent":"corina-eval-fixture","capability":"concise","mode":"quick","version":"fixture","timestamp":"2026-04-10T00:00:00.000Z","input_summary":"fixture","artifact":{"mode":"quick","original_word_count":17,"revised_word_count":12,"compression_ratio":0.71,"revised_draft":"This test sentence contains redundant phrases that can be made more concise.","heat_map":[{"tag":"REDUND","severity":"Moderate","count":1}],"revision_log":[],"preservation_check":{"facts":true,"nuance":true,"argument_function":true,"evidence":true,"tone_voice":true,"chronology":true},"unresolved_issues":[]},"rendered":"This test sentence contains redundant phrases that can be made more concise."}'
+  expect:
+    schema_valid: true
+    json_parseable: true
+
+- id: concise-auto-mode-detection-short
+  capability: concise
+  input:
+    text: "Short text under 500 words."
+    candidate: "Short text under 500 words."
+  expect:
+    mode_used: "quick"
+    output_present: true
+
+- id: concise-preserves-facts
+  capability: concise
+  input:
+    text: "The company was founded in 1995 by John Smith and Mary Jones. It currently employs approximately 500 people and has offices in New York, London, and Tokyo. Revenue last year was $120 million."
+    mode: "quick"
+    candidate: "Founded in 1995 by John Smith and Mary Jones, the company employs about 500 people, has offices in New York, London, and Tokyo, and reported $120 million in revenue last year."
+  expect:
+    schema_valid: true
+    output_present: true
+    no_fabrication: true

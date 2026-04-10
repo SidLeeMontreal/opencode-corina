@@ -4,7 +4,8 @@
     "./corina-tone.json",
     "./corina-detect.json",
     "./corina-critique.json",
-    "./corina-pipeline.json"
+    "./corina-pipeline.json",
+    "./corina-concise.json"
   ],
   "tiers": [1, 2],
   "judgeAgent": "critic"

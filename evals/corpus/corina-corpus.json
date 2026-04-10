@@ -626,6 +626,183 @@
         "fact-loss"
       ],
       "tier": 1
+    },
+    {
+      "id": "concise-never-fail-short",
+      "label": "Concise never fails on very short input",
+      "input": {
+        "text": "Hello.",
+        "mode": "quick",
+        "candidate": "Hello."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 3,
+        "must_contain": [
+          "Hello"
+        ],
+        "must_preserve": [
+          "Hello"
+        ],
+        "notes": [
+          "Should return a valid concise artifact without inventing content."
+        ]
+      },
+      "tags": [
+        "concise",
+        "short",
+        "never-fail"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-never-fail-empty-ish",
+      "label": "Concise preserves already minimal copy",
+      "input": {
+        "text": "The report is good.",
+        "mode": "quick",
+        "candidate": "The report is good."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 3,
+        "must_contain": [
+          "report"
+        ],
+        "must_preserve": [
+          "good"
+        ],
+        "notes": [
+          "Should degrade safely when there is little or nothing to compress."
+        ]
+      },
+      "tags": [
+        "concise",
+        "minimal",
+        "never-fail"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-quick-mode-padded",
+      "label": "Concise trims padded short-form copy",
+      "input": {
+        "text": "In today's rapidly evolving world, it is absolutely essential that we carefully consider and take into account all of the various different factors that may potentially impact our ability to make truly informed and well-considered decisions about the future direction of our organization.",
+        "mode": "quick",
+        "candidate": "We need to consider the factors that could affect our organization's future so we can make informed decisions."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "rapidly evolving world",
+          "various different",
+          "well-considered decisions"
+        ],
+        "must_contain": [
+          "organization"
+        ],
+        "must_preserve": [
+          "informed decisions"
+        ]
+      },
+      "tags": [
+        "concise",
+        "quick",
+        "compression"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-json-format",
+      "label": "Concise JSON envelope remains parseable",
+      "input": {
+        "text": "This is a test sentence that contains some redundant and repetitive words and phrases that could be made more concise.",
+        "mode": "quick",
+        "format": "json",
+        "candidate": "{\"agent\":\"corina-eval-fixture\",\"capability\":\"concise\",\"mode\":\"quick\",\"version\":\"fixture\",\"timestamp\":\"2026-04-10T00:00:00.000Z\",\"input_summary\":\"Offline fixture output for concise-json-format\",\"artifact\":{\"mode\":\"quick\",\"original_word_count\":17,\"revised_word_count\":11,\"compression_ratio\":0.65,\"revised_draft\":\"This test sentence contains redundant phrases that can be tightened.\",\"heat_map\":[{\"tag\":\"REDUND\",\"severity\":\"Moderate\",\"count\":1}],\"revision_log\":[],\"preservation_check\":{\"facts\":true,\"nuance\":true,\"argument_function\":true,\"evidence\":true,\"tone_voice\":true,\"chronology\":true},\"unresolved_issues\":[]},\"rendered\":\"## Concise Draft (mode: quick, -35% words)\n\nThis test sentence contains redundant phrases that can be tightened.\n\n---\nHeat Map: REDUND Moderate:1\nCompression: 17 \u2192 11 words (65%)\"}"
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 3,
+        "must_contain": [
+          "\"capability\":\"concise\"",
+          "\"mode\":\"quick\"",
+          "\"artifact\""
+        ],
+        "must_preserve": [
+          "redundant"
+        ],
+        "notes": [
+          "Exercises the universal JSON envelope path for the concise tool."
+        ]
+      },
+      "tags": [
+        "concise",
+        "json"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-auto-mode-detection-short",
+      "label": "Concise auto mode resolves to quick for short input",
+      "input": {
+        "text": "Short text under 500 words.",
+        "candidate": "Short text under 500 words."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 3,
+        "must_contain": [
+          "Short text"
+        ],
+        "must_preserve": [
+          "500"
+        ],
+        "notes": [
+          "Auto mode should resolve to quick for short content."
+        ]
+      },
+      "tags": [
+        "concise",
+        "auto"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-preserves-facts",
+      "label": "Concise preserves hard facts while tightening copy",
+      "input": {
+        "text": "The company was founded in 1995 by John Smith and Mary Jones. It currently employs approximately 500 people and has offices in New York, London, and Tokyo. Revenue last year was $120 million.",
+        "mode": "quick",
+        "candidate": "Founded in 1995 by John Smith and Mary Jones, the company employs about 500 people, has offices in New York, London, and Tokyo, and reported $120 million in revenue last year."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 4,
+        "must_contain": [
+          "1995",
+          "John Smith",
+          "Mary Jones",
+          "500",
+          "New York",
+          "London",
+          "Tokyo",
+          "$120 million"
+        ],
+        "must_preserve": [
+          "1995",
+          "$120 million"
+        ],
+        "notes": [
+          "Concision must preserve all explicit factual anchors."
+        ]
+      },
+      "tags": [
+        "concise",
+        "facts"
+      ],
+      "tier": 1
     }
   ]
 }

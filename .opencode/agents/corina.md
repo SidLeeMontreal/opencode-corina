@@ -13,5 +13,9 @@ permission:
     "detector": allow
     "tone-writer": allow
     "tone-validator": allow
+    "concise-auditor": allow
+    "concise-reviser": allow
+    "concise-stitcher": allow
+    "concise-reconciler": allow
 prompt: ../../prompts/base/corina-persona.md
 ---

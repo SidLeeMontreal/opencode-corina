@@ -25,6 +25,10 @@ User
 | detector | subagent | LLM-based AI detection judge (Layer 2). Invoked by the `detect` tool. |
 | tone-writer | subagent | Voice application. Invoked by the `tone` tool. |
 | tone-validator | subagent | Validates tone rewrite quality. Invoked by the `tone` tool. |
+| concise-auditor | subagent | Document orchestrator for `/corina-concise` Pass A. |
+| concise-reviser | subagent | Paragraph-window reviser for `/corina-concise` Pass B. |
+| concise-stitcher | subagent | Stitch pass for `/corina-concise` Pass C. |
+| concise-reconciler | subagent | Reconciliation pass for `/corina-concise` Pass D. |
 
 All subagents are hidden (not in @autocomplete). They are invoked programmatically via the Task tool only.
 
@@ -36,6 +40,7 @@ All subagents are hidden (not in @autocomplete). They are invoked programmatical
 | `tone` | `.opencode/tools/tone.ts` | Voice/tone rewriter (11 voices) |
 | `detect` | `.opencode/tools/detect.ts` | AI-pattern detector (Layer 1 + Layer 2) |
 | `critique` | `.opencode/tools/critique.ts` | Quality / audience / rubric / compare modes |
+| `concise` | `.opencode/tools/concise.ts` | Text concision — removes fluff, preserves substance (quick + full modes) |
 
 Tools are standalone files. They load independently of the plugin.
 The plugin (`src/index.ts`) observes all tool calls via `tool.execute.after` for logging and audit.
@@ -75,7 +80,7 @@ Loader: `src/prompt-loader.ts` (checks override dir first, falls back to bundled
 Corina can spawn subagents via the built-in `Task` tool. `permission.task` in `corina.md`
 controls which subagents are accessible. Subagent names map to `.opencode/agents/*.md` filenames.
 
-Current allowed subagents: critic, auditor, detector, tone-writer, tone-validator
+Current allowed subagents: critic, auditor, detector, tone-writer, tone-validator, concise-auditor, concise-reviser, concise-stitcher, concise-reconciler
 
 To add a new invocable subagent:
 1. Create `.opencode/agents/your-agent.md` with `mode: subagent` and `hidden: true`
@@ -102,7 +107,7 @@ Every tool must return output for every valid input.
 ## Future: OpenWork Integration
 
 When async job execution is added:
-- `write`, `tone`, `detect`, `critique` tools gain `submit_*_job` / `get_*_job_status` variants
+- `write`, `tone`, `detect`, `critique`, `concise` tools gain `submit_*_job` / `get_*_job_status` variants
 - Tools return a job receipt immediately; result is fetched when ready
 - Plugin gains a `job.status.updated` event handler to surface results
 - Standalone tool files make this swap possible without touching the plugin

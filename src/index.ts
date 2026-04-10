@@ -11,7 +11,7 @@ export const CorinaPlugin: Plugin = async ({ client }) => {
       logger.info("plugin_loaded", { plugin: "opencode-corina", version: "0.1.0" });
     },
     "tool.execute.after": async (input, output) => {
-      const trackedTools = ["write", "tone", "detect", "critique"];
+      const trackedTools = ["write", "tone", "detect", "critique", "concise"];
       if (!trackedTools.includes(input.tool)) {
         return;
       }

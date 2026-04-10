@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConciseArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "original_word_count",
+    "revised_word_count",
+    "compression_ratio",
+    "revised_draft",
+    "heat_map",
+    "revision_log",
+    "preservation_check",
+    "unresolved_issues"
+  ],
+  "properties": {
+    "mode": { "type": "string", "enum": ["quick", "full"] },
+    "original_word_count": { "type": "integer", "minimum": 0 },
+    "revised_word_count": { "type": "integer", "minimum": 0 },
+    "compression_ratio": { "type": "number", "minimum": 0 },
+    "revised_draft": { "type": "string" },
+    "heat_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tag", "severity", "count"],
+        "properties": {
+          "tag": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["Minor", "Moderate", "Major"] },
+          "count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "revision_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "original_excerpt", "tags", "solution_move", "new_text", "scope"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "original_excerpt": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "solution_move": { "type": "string", "minLength": 1 },
+          "new_text": { "type": "string" },
+          "scope": { "type": "string", "enum": ["Target", "Previous bridge", "Next bridge"] }
+        }
+      }
+    },
+    "preservation_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["facts", "nuance", "argument_function", "evidence", "tone_voice", "chronology"],
+      "properties": {
+        "facts": { "type": "boolean" },
+        "nuance": { "type": "boolean" },
+        "argument_function": { "type": "boolean" },
+        "evidence": { "type": "boolean" },
+        "tone_voice": { "type": "boolean" },
+        "chronology": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    },
+    "unresolved_issues": { "type": "array", "items": { "type": "string" } },
+    "reconciliation_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "location", "issue_type", "what_changed", "reason"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "location": { "type": "string", "minLength": 1 },
+          "issue_type": { "type": "string", "minLength": 1 },
+          "what_changed": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "paragraph_function_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["paragraph", "function", "compression_priority", "revision_risk", "preservation_constraints"],
+        "properties": {
+          "paragraph": { "type": "string", "minLength": 1 },
+          "function": { "type": "string", "minLength": 1 },
+          "compression_priority": { "type": "string", "enum": ["High", "Medium", "Low", "None"] },
+          "revision_risk": { "type": "string", "enum": ["Low risk", "Medium risk", "High risk"] },
+          "preservation_constraints": { "type": "string" }
+        }
+      }
+    }
+  }
+}

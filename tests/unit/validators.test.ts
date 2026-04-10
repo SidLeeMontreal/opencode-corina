@@ -92,4 +92,37 @@ describe("validators", () => {
 
     expect(result.valid).toBe(true)
   })
+
+  it("passes a valid ConciseArtifact", () => {
+    const result = validate("ConciseArtifact", {
+      mode: "quick",
+      original_word_count: 20,
+      revised_word_count: 14,
+      compression_ratio: 0.7,
+      revised_draft: "A tighter version of the draft.",
+      heat_map: [{ tag: "REDUND", severity: "Moderate", count: 1 }],
+      revision_log: [
+        {
+          id: "R1",
+          original_excerpt: "really very important",
+          tags: ["REDUND"],
+          solution_move: "Merge or delete",
+          new_text: "important",
+          scope: "Target",
+        },
+      ],
+      preservation_check: {
+        facts: true,
+        nuance: true,
+        argument_function: true,
+        evidence: true,
+        tone_voice: true,
+        chronology: true,
+      },
+      unresolved_issues: [],
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual([])
+  })
 })

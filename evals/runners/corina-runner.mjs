@@ -90,6 +90,16 @@ export async function runCorinaEvalCase(evalCase, context) {
     return mod.runPipelineWithArtifact(input.text ?? '', client)
   }
 
+  if (evalCase.capability === 'concise') {
+    const mod = await loadDistModule('concise')
+    return mod.runConciseWithArtifact({
+      text: input.text ?? '',
+      mode: input.mode,
+      target_words: input.target_words,
+      format: input.format,
+    }, client)
+  }
+
   throw new Error(`Unsupported capability: ${evalCase.capability}`)
 }
 
