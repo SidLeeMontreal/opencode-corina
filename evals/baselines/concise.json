@@ -1,0 +1,28 @@
+{
+  "capability": "concise",
+  "baseline_run_date": null,
+  "model": null,
+  "note": "Baseline not yet locked. Run npm run eval:tier2 after COR-282 corpus cases are verified passing, then update this file.",
+  "dimensions": {
+    "information_density": {
+      "min_score": 70,
+      "baseline_score": null
+    },
+    "voice_preserved": {
+      "min_score": 70,
+      "baseline_score": null
+    },
+    "no_overcompression": {
+      "min_score": 70,
+      "baseline_score": null
+    },
+    "no_fabrication": {
+      "min_score": 70,
+      "baseline_score": null
+    },
+    "coherence": {
+      "min_score": 70,
+      "baseline_score": null
+    }
+  }
+}

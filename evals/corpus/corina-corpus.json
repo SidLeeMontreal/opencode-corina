@@ -1,6 +1,6 @@
 {
   "id": "corina-corpus",
-  "version": "2026-04-10.1",
+  "version": "2026-04-10.5",
   "cases": [
     {
       "id": "tone-ai-to-journalist",
@@ -73,7 +73,7 @@
       "input": {
         "text": "We shipped the first version. It still feels rough, but it works.",
         "voice": "personal",
-        "candidate": "We shipped the first version. It's still a little rough around the edges, but it works \u2014 and that's enough to learn from."
+        "candidate": "We shipped the first version. It's still a little rough around the edges, but it works — and that's enough to learn from."
       },
       "capability": "tone",
       "expected": {
@@ -720,7 +720,7 @@
         "text": "This is a test sentence that contains some redundant and repetitive words and phrases that could be made more concise.",
         "mode": "quick",
         "format": "json",
-        "candidate": "{\"agent\":\"corina-eval-fixture\",\"capability\":\"concise\",\"mode\":\"quick\",\"version\":\"fixture\",\"timestamp\":\"2026-04-10T00:00:00.000Z\",\"input_summary\":\"Offline fixture output for concise-json-format\",\"artifact\":{\"mode\":\"quick\",\"original_word_count\":17,\"revised_word_count\":11,\"compression_ratio\":0.65,\"revised_draft\":\"This test sentence contains redundant phrases that can be tightened.\",\"heat_map\":[{\"tag\":\"REDUND\",\"severity\":\"Moderate\",\"count\":1}],\"revision_log\":[],\"preservation_check\":{\"facts\":true,\"nuance\":true,\"argument_function\":true,\"evidence\":true,\"tone_voice\":true,\"chronology\":true},\"unresolved_issues\":[]},\"rendered\":\"## Concise Draft (mode: quick, -35% words)\n\nThis test sentence contains redundant phrases that can be tightened.\n\n---\nHeat Map: REDUND Moderate:1\nCompression: 17 \u2192 11 words (65%)\"}"
+        "candidate": "{\"agent\":\"corina-eval-fixture\",\"capability\":\"concise\",\"mode\":\"quick\",\"version\":\"fixture\",\"timestamp\":\"2026-04-10T00:00:00.000Z\",\"input_summary\":\"Offline fixture output for concise-json-format\",\"artifact\":{\"mode\":\"quick\",\"original_word_count\":17,\"revised_word_count\":11,\"compression_ratio\":0.65,\"revised_draft\":\"This test sentence contains redundant phrases that can be tightened.\",\"heat_map\":[{\"tag\":\"REDUND\",\"severity\":\"Moderate\",\"count\":1}],\"revision_log\":[],\"preservation_check\":{\"facts\":true,\"nuance\":true,\"argument_function\":true,\"evidence\":true,\"tone_voice\":true,\"chronology\":true},\"unresolved_issues\":[]},\"rendered\":\"## Concise Draft (mode: quick, -35% words)\n\nThis test sentence contains redundant phrases that can be tightened.\n\n---\nHeat Map: REDUND Moderate:1\nCompression: 17 → 11 words (65%)\"}"
       },
       "capability": "concise",
       "expected": {
@@ -803,6 +803,528 @@
         "facts"
       ],
       "tier": 1
+    },
+    {
+      "id": "concise-full-mode-long",
+      "label": "Concise full mode trims padded executive tech copy",
+      "input": {
+        "text": "If you spend any amount of time in boardrooms, planning off-sites, or the increasingly crowded overlap between marketing and technology leadership, you will probably hear a familiar refrain about transformation. It tends to arrive wrapped in a language of momentum, acceleration, possibility, and strategic urgency. And, to be fair, some of that language reflects something real. The environment is moving. Customer expectations are shifting. AI systems are changing the economics of content, analysis, and execution. But if I am honest about what I keep seeing across the market, and what I have watched inside my own organization over the last year, the bigger problem is not a lack of ambition. It is that we often talk about modernizing the marketing function in a way that is so broad, so padded, and so emotionally over-insured that the actual point gets buried under layers of framing.\n\nWhat many of us mean, underneath all of the prefacing and signaling and careful positioning, is something much simpler. We need to remove friction from how marketing work gets done. We need to help teams get from insight to message to execution without spending unnecessary time rewriting, re-approving, and re-explaining what should already be clear. We need better systems, yes, but we also need fewer rituals that make people feel busy without making the work better. I think there has been a tendency, especially in large organizations, to describe every tooling discussion as if it represents a sweeping philosophical shift. Sometimes it does. More often, it is a practical attempt to stop wasting the time of very expensive people. That may sound less visionary. It also happens to be true.\n\nIn my experience, one of the least helpful habits in this space is the habit of describing AI as if it were a kind of atmospheric force rather than a set of specific capabilities that either improve a workflow or do not. Teams say they want to lean in. They say they want to unlock value. They say they want to meet the moment. Those phrases create the feeling of movement, but they are frequently substitutes for decisions that should be concrete. Which tasks are we trying to shorten? Which approvals are we trying to reduce? Which parts of the writing process still need senior judgment, and which parts are mostly mechanical? Until those questions are answered plainly, the transformation narrative can become a shelter for vagueness. You can sound current and still avoid clarity.\n\nThis is especially visible in content organizations, where the rhetoric of scale often masks the reality of churn. A team may say it is building an intelligent content engine, but what that sometimes means in practice is that five smart people are still spending half their week cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether a statistic survived three rounds of editing. That is not a failure of talent. It is a failure of operating design. And while I do believe the new generation of writing and analysis tools can help materially, I also think leaders do themselves a disservice when they oversell them. The point is not to create a futuristic aura around the marketing department. The point is to produce clearer thinking, faster decisions, and better output with less drag.\n\nSo when I talk about AI-enabled transformation in marketing, I am trying, with mixed success some days, to resist the temptation to make it sound grander than it is. Yes, the stakes are meaningful. Yes, the pace of change is real. Yes, there is strategic advantage in learning faster than your competitors. But there is also a more grounded truth that deserves to be said directly. Most teams would see real gains if they simply wrote with less throat-clearing, made fewer people re-litigate the same paragraph, and built review systems that preserved facts while stripping away noise. That is not the whole story of transformation. It is, however, a very practical place to start, and practical starts are often what separate organizations that keep talking from organizations that actually improve.",
+        "mode": "full",
+        "candidate": "Marketing transformation does not fail for lack of ambition. It fails when vague language hides the operational work that actually needs to change.\n\nThe real goal is simpler than the rhetoric suggests: remove friction from how marketing work gets done. Teams need to move from insight to message to execution without repeated rewriting, approvals, and explanations. Better tools matter, but so does cutting rituals that create the appearance of activity without improving output.\n\nThat is why it helps to talk about AI concretely. Instead of saying we want to unlock value or meet the moment, leaders should ask which tasks need to be shortened, which approvals can be reduced, and where senior judgment is still essential. Without those decisions, transformation language becomes a polished way to avoid clarity.\n\nThe problem is obvious in content operations. Many teams still spend too much time cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether facts survived multiple editing passes. That is not a talent problem. It is an operating-design problem.\n\nAI tools can help, but only if they reduce drag in real workflows. The point is not to create a futuristic aura around marketing. It is to produce clearer thinking, faster decisions, and stronger output. In practice, that often starts with cleaner writing, fewer redundant reviews, and systems that preserve facts while stripping away noise."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 0,
+        "must_contain": [
+          "operational",
+          "marketing",
+          "clarity"
+        ],
+        "must_preserve": [
+          "AI",
+          "workflow"
+        ],
+        "notes": [
+          "Exercises full-mode long-form compression with realistic CMO/tech copy."
+        ]
+      },
+      "tags": [
+        "concise",
+        "full",
+        "compression"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-full-mode-fact-preservation",
+      "label": "Concise full mode preserves dense factual detail",
+      "input": {
+        "text": "Northshore Systems has spent most of the last decade trying to outgrow the category labels that followed it after its early warehouse software success. The Toronto company was founded in 2011 by Elena Park and Martin Hale, who had previously worked on supply-chain analytics projects for retail and manufacturing clients across Ontario. At launch, the company had eight employees in a small office near King Street West. Today it reports 640 employees, with major teams in Toronto, Chicago, and Dublin, and a customer base that includes logistics operators, regional grocers, and industrial distributors. According to the company, fiscal 2025 revenue reached $148 million, up from $121 million a year earlier. The flagship product, Railhouse Cloud, is used to manage forecasting, purchasing, and exception reporting across multi-site inventory networks.\n\nNorthshore's current expansion strategy dates back to March 14, 2023, when chief executive Elena Park told analysts in Boston that the company would move more aggressively into midmarket manufacturing accounts. The company opened its Chicago office on June 5, 2023, and announced the Dublin location on January 18, 2024, saying the European team would support customers in Ireland, Germany, and the Netherlands. Northshore says its software now processes more than 92 million inventory events each month. In November 2024, it launched Railhouse Signal, a monitoring layer designed to flag disruptions caused by late shipments, supplier outages, and unusual demand swings before planners feel the effect downstream.\n\nThat growth has not been entirely smooth. During a customer event in Austin on September 9, 2025, Park acknowledged that the company had underestimated onboarding complexity for clients with older ERP systems. She said some deployments that had been scoped for 14 weeks were taking closer to 20. Even so, Northshore retained 96 percent of its revenue base last year, according to figures shared with customers and partners at the event. Chief financial officer Daniel Ruiz said the company expects hiring to remain disciplined in 2026, with most new roles concentrated in implementation, product support, and applied data science rather than general administration.\n\nInvestors and customers are watching to see whether Northshore can maintain that balance: enough product ambition to keep growing, but enough operational discipline to avoid the sprawl that has slowed larger competitors. The company plans to hold its next customer summit in Chicago on May 12, 2026. For now, the story is less about hype than execution. Northshore has specific products, named leaders, disclosed expansion dates, and a clear record of where the business is gaining traction and where it is still working through friction.",
+        "mode": "full",
+        "candidate": "Northshore Systems, founded in Toronto in 2011 by Elena Park and Martin Hale, has grown from an eight-person startup near King Street West to a 640-employee software company with teams in Toronto, Chicago, and Dublin. The company said fiscal 2025 revenue reached $148 million, up from $121 million the year before. Its flagship product, Railhouse Cloud, supports forecasting, purchasing, and exception reporting, and Northshore added Railhouse Signal in November 2024 to flag disruptions across inventory networks.\n\nThe company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023. Northshore opened its Chicago office on June 5, 2023, announced Dublin on January 18, 2024, and says the platform now processes more than 92 million inventory events each month.\n\nPark said in Austin on September 9, 2025 that onboarding clients with older ERP systems had taken longer than expected, with some projects stretching from 14 weeks to about 20. Even so, Northshore said it retained 96 percent of its revenue base last year. CFO Daniel Ruiz said 2026 hiring would stay focused on implementation, product support, and applied data science. The next customer summit is scheduled for Chicago on May 12, 2026."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 0,
+        "must_contain": [
+          "2011",
+          "Elena Park",
+          "Martin Hale",
+          "$148 million",
+          "May 12, 2026"
+        ],
+        "must_preserve": [
+          "Chicago",
+          "Daniel Ruiz"
+        ],
+        "notes": [
+          "Checks that full mode keeps named entities, dates, and figures intact."
+        ]
+      },
+      "tags": [
+        "concise",
+        "full",
+        "facts"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-full-mode-never-fail",
+      "label": "Concise full mode always returns output on long input",
+      "input": {
+        "text": "If you spend any amount of time in boardrooms, planning off-sites, or the increasingly crowded overlap between marketing and technology leadership, you will probably hear a familiar refrain about transformation. It tends to arrive wrapped in a language of momentum, acceleration, possibility, and strategic urgency. And, to be fair, some of that language reflects something real. The environment is moving. Customer expectations are shifting. AI systems are changing the economics of content, analysis, and execution. But if I am honest about what I keep seeing across the market, and what I have watched inside my own organization over the last year, the bigger problem is not a lack of ambition. It is that we often talk about modernizing the marketing function in a way that is so broad, so padded, and so emotionally over-insured that the actual point gets buried under layers of framing.\n\nWhat many of us mean, underneath all of the prefacing and signaling and careful positioning, is something much simpler. We need to remove friction from how marketing work gets done. We need to help teams get from insight to message to execution without spending unnecessary time rewriting, re-approving, and re-explaining what should already be clear. We need better systems, yes, but we also need fewer rituals that make people feel busy without making the work better. I think there has been a tendency, especially in large organizations, to describe every tooling discussion as if it represents a sweeping philosophical shift. Sometimes it does. More often, it is a practical attempt to stop wasting the time of very expensive people. That may sound less visionary. It also happens to be true.\n\nIn my experience, one of the least helpful habits in this space is the habit of describing AI as if it were a kind of atmospheric force rather than a set of specific capabilities that either improve a workflow or do not. Teams say they want to lean in. They say they want to unlock value. They say they want to meet the moment. Those phrases create the feeling of movement, but they are frequently substitutes for decisions that should be concrete. Which tasks are we trying to shorten? Which approvals are we trying to reduce? Which parts of the writing process still need senior judgment, and which parts are mostly mechanical? Until those questions are answered plainly, the transformation narrative can become a shelter for vagueness. You can sound current and still avoid clarity.\n\nThis is especially visible in content organizations, where the rhetoric of scale often masks the reality of churn. A team may say it is building an intelligent content engine, but what that sometimes means in practice is that five smart people are still spending half their week cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether a statistic survived three rounds of editing. That is not a failure of talent. It is a failure of operating design. And while I do believe the new generation of writing and analysis tools can help materially, I also think leaders do themselves a disservice when they oversell them. The point is not to create a futuristic aura around the marketing department. The point is to produce clearer thinking, faster decisions, and better output with less drag.\n\nSo when I talk about AI-enabled transformation in marketing, I am trying, with mixed success some days, to resist the temptation to make it sound grander than it is. Yes, the stakes are meaningful. Yes, the pace of change is real. Yes, there is strategic advantage in learning faster than your competitors. But there is also a more grounded truth that deserves to be said directly. Most teams would see real gains if they simply wrote with less throat-clearing, made fewer people re-litigate the same paragraph, and built review systems that preserved facts while stripping away noise. That is not the whole story of transformation. It is, however, a very practical place to start, and practical starts are often what separate organizations that keep talking from organizations that actually improve.",
+        "mode": "full",
+        "candidate": "Marketing transformation does not fail for lack of ambition. It fails when vague language hides the operational work that actually needs to change.\n\nThe real goal is simpler than the rhetoric suggests: remove friction from how marketing work gets done. Teams need to move from insight to message to execution without repeated rewriting, approvals, and explanations. Better tools matter, but so does cutting rituals that create the appearance of activity without improving output.\n\nThat is why it helps to talk about AI concretely. Instead of saying we want to unlock value or meet the moment, leaders should ask which tasks need to be shortened, which approvals can be reduced, and where senior judgment is still essential. Without those decisions, transformation language becomes a polished way to avoid clarity.\n\nThe problem is obvious in content operations. Many teams still spend too much time cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether facts survived multiple editing passes. That is not a talent problem. It is an operating-design problem.\n\nAI tools can help, but only if they reduce drag in real workflows. The point is not to create a futuristic aura around marketing. It is to produce clearer thinking, faster decisions, and stronger output. In practice, that often starts with cleaner writing, fewer redundant reviews, and systems that preserve facts while stripping away noise."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 0,
+        "must_contain": [
+          "Marketing transformation"
+        ],
+        "notes": [
+          "Should always return some concise output in full mode."
+        ]
+      },
+      "tags": [
+        "concise",
+        "full",
+        "never-fail"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-full-mode-schema",
+      "label": "Concise full mode JSON includes full-mode-only fields",
+      "input": {
+        "text": "Northshore Systems has spent most of the last decade trying to outgrow the category labels that followed it after its early warehouse software success. The Toronto company was founded in 2011 by Elena Park and Martin Hale, who had previously worked on supply-chain analytics projects for retail and manufacturing clients across Ontario. At launch, the company had eight employees in a small office near King Street West. Today it reports 640 employees, with major teams in Toronto, Chicago, and Dublin, and a customer base that includes logistics operators, regional grocers, and industrial distributors. According to the company, fiscal 2025 revenue reached $148 million, up from $121 million a year earlier. The flagship product, Railhouse Cloud, is used to manage forecasting, purchasing, and exception reporting across multi-site inventory networks.\n\nNorthshore's current expansion strategy dates back to March 14, 2023, when chief executive Elena Park told analysts in Boston that the company would move more aggressively into midmarket manufacturing accounts. The company opened its Chicago office on June 5, 2023, and announced the Dublin location on January 18, 2024, saying the European team would support customers in Ireland, Germany, and the Netherlands. Northshore says its software now processes more than 92 million inventory events each month. In November 2024, it launched Railhouse Signal, a monitoring layer designed to flag disruptions caused by late shipments, supplier outages, and unusual demand swings before planners feel the effect downstream.\n\nThat growth has not been entirely smooth. During a customer event in Austin on September 9, 2025, Park acknowledged that the company had underestimated onboarding complexity for clients with older ERP systems. She said some deployments that had been scoped for 14 weeks were taking closer to 20. Even so, Northshore retained 96 percent of its revenue base last year, according to figures shared with customers and partners at the event. Chief financial officer Daniel Ruiz said the company expects hiring to remain disciplined in 2026, with most new roles concentrated in implementation, product support, and applied data science rather than general administration.\n\nInvestors and customers are watching to see whether Northshore can maintain that balance: enough product ambition to keep growing, but enough operational discipline to avoid the sprawl that has slowed larger competitors. The company plans to hold its next customer summit in Chicago on May 12, 2026. For now, the story is less about hype than execution. Northshore has specific products, named leaders, disclosed expansion dates, and a clear record of where the business is gaining traction and where it is still working through friction.",
+        "mode": "full",
+        "format": "json",
+        "candidate": "{\"agent\":\"corina-eval-fixture\",\"capability\":\"concise\",\"mode\":\"full\",\"version\":\"fixture\",\"timestamp\":\"2026-04-10T00:00:00.000Z\",\"input_summary\":\"Offline fixture output for concise-full-mode-schema\",\"artifact\":{\"mode\":\"full\",\"original_word_count\":648,\"revised_word_count\":290,\"compression_ratio\":0.45,\"revised_draft\":\"Northshore Systems, founded in Toronto in 2011 by Elena Park and Martin Hale, has grown from an eight-person startup near King Street West to a 640-employee software company with teams in Toronto, Chicago, and Dublin. The company said fiscal 2025 revenue reached $148 million, up from $121 million the year before. Its flagship product, Railhouse Cloud, supports forecasting, purchasing, and exception reporting, and Northshore added Railhouse Signal in November 2024 to flag disruptions across inventory networks.\\n\\nThe company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023. Northshore opened its Chicago office on June 5, 2023, announced Dublin on January 18, 2024, and says the platform now processes more than 92 million inventory events each month.\\n\\nPark said in Austin on September 9, 2025 that onboarding clients with older ERP systems had taken longer than expected, with some projects stretching from 14 weeks to about 20. Even so, Northshore said it retained 96 percent of its revenue base last year. CFO Daniel Ruiz said 2026 hiring would stay focused on implementation, product support, and applied data science. The next customer summit is scheduled for Chicago on May 12, 2026.\",\"heat_map\":[{\"tag\":\"THROAT_CLEARING\",\"severity\":\"Moderate\",\"count\":3},{\"tag\":\"REDUND\",\"severity\":\"Major\",\"count\":4}],\"revision_log\":[{\"id\":\"r1\",\"original_excerpt\":\"Northshore's current expansion strategy dates back to March 14, 2023...\",\"tags\":[\"REDUND\"],\"solution_move\":\"Condensed timeline details into a tighter chronology while preserving dates and names.\",\"new_text\":\"The company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023.\",\"scope\":\"Target\"}],\"preservation_check\":{\"facts\":true,\"nuance\":true,\"argument_function\":true,\"evidence\":true,\"tone_voice\":true,\"chronology\":true},\"unresolved_issues\":[],\"paragraph_function_map\":[{\"paragraph\":\"Paragraph 1\",\"function\":\"Company overview and factual baseline\",\"compression_priority\":\"Medium\",\"revision_risk\":\"High risk\",\"preservation_constraints\":\"Keep founding year, founders, employee count, locations, revenue, and product name.\"},{\"paragraph\":\"Paragraph 2\",\"function\":\"Expansion timeline and product launch\",\"compression_priority\":\"High\",\"revision_risk\":\"High risk\",\"preservation_constraints\":\"Preserve all dates, locations, and the monthly inventory-event figure.\"},{\"paragraph\":\"Paragraph 3\",\"function\":\"Operational friction and retention context\",\"compression_priority\":\"Medium\",\"revision_risk\":\"High risk\",\"preservation_constraints\":\"Retain Austin date, onboarding durations, retention rate, and Daniel Ruiz hiring plan.\"},{\"paragraph\":\"Paragraph 4\",\"function\":\"Conclusion and forward-looking framing\",\"compression_priority\":\"Low\",\"revision_risk\":\"Medium risk\",\"preservation_constraints\":\"Keep Chicago summit date and execution framing.\"}],\"reconciliation_log\":[{\"id\":\"c1\",\"location\":\"Paragraph 2\",\"issue_type\":\"chronology-tightening\",\"what_changed\":\"Merged two expansion sentences into one timeline paragraph.\",\"reason\":\"Reduced repetition while preserving named dates and locations.\"}]},\"rendered\":\"## Concise Draft (mode: full, -55% words)\\n\\nNorthshore Systems, founded in Toronto in 2011 by Elena Park and Martin Hale, has grown from an eight-person startup near King Street West to a 640-employee software company with teams in Toronto, Chicago, and Dublin. The company said fiscal 2025 revenue reached $148 million, up from $121 million the year before. Its flagship product, Railhouse Cloud, supports forecasting, purchasing, and exception reporting, and Northshore added Railhouse Signal in November 2024 to flag disruptions across inventory networks.\\n\\nThe company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023. Northshore opened its Chicago office on June 5, 2023, announced Dublin on January 18, 2024, and says the platform now processes more than 92 million inventory events each month.\\n\\nPark said in Austin on September 9, 2025 that onboarding clients with older ERP systems had taken longer than expected, with some projects stretching from 14 weeks to about 20. Even so, Northshore said it retained 96 percent of its revenue base last year. CFO Daniel Ruiz said 2026 hiring would stay focused on implementation, product support, and applied data science. The next customer summit is scheduled for Chicago on May 12, 2026.\\n\\n---\\nHeat Map: THROAT_CLEARING Moderate:3, REDUND Major:4\\nCompression: 648 → 290 words (45%)\"}"
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 0,
+        "must_contain": [
+          "\"paragraph_function_map\"",
+          "\"reconciliation_log\"",
+          "\"mode\":\"full\""
+        ],
+        "must_preserve": [
+          "\"capability\":\"concise\""
+        ],
+        "notes": [
+          "Exercises the JSON envelope for full mode with full-mode-only artifact fields."
+        ]
+      },
+      "tags": [
+        "concise",
+        "full",
+        "json"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-already-efficient",
+      "label": "Concise quick mode handles already efficient copy",
+      "input": {
+        "text": "We cut the launch scope, fixed the checkout bug, and shipped on Friday. Support tickets stayed flat, conversion held, and the team documented the rollback path before release. It was a disciplined week, not a glamorous one, and that is exactly why the result held.",
+        "mode": "quick",
+        "candidate": "We cut the launch scope, fixed the checkout bug, and shipped on Friday. Support tickets stayed flat, conversion held, and the team documented the rollback path before release. It was a disciplined week, not a glamorous one, and that is exactly why the result held."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 4,
+        "must_contain": [
+          "shipped on Friday",
+          "rollback path"
+        ],
+        "must_preserve": [
+          "Support tickets",
+          "conversion"
+        ],
+        "notes": [
+          "Already efficient text may come back unchanged."
+        ]
+      },
+      "tags": [
+        "concise",
+        "quick",
+        "efficient"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-target-words-quick",
+      "label": "Concise quick mode accepts target_words",
+      "input": {
+        "text": "Our team is, in many ways, really trying to move forward with a launch plan that feels genuinely thoughtful, carefully considered, and responsive to what customers have been saying over the last several weeks in meetings and feedback calls.",
+        "mode": "quick",
+        "target_words": 50,
+        "candidate": "The team is moving forward with a thoughtful launch plan shaped by recent customer feedback."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 4,
+        "must_contain": [
+          "launch plan",
+          "customer feedback"
+        ],
+        "notes": [
+          "Validates that target_words is accepted in quick mode."
+        ]
+      },
+      "tags": [
+        "concise",
+        "quick",
+        "target-words"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-target-words-full",
+      "label": "Concise full mode accepts target_words",
+      "input": {
+        "text": "If you spend any amount of time in boardrooms, planning off-sites, or the increasingly crowded overlap between marketing and technology leadership, you will probably hear a familiar refrain about transformation. It tends to arrive wrapped in a language of momentum, acceleration, possibility, and strategic urgency. And, to be fair, some of that language reflects something real. The environment is moving. Customer expectations are shifting. AI systems are changing the economics of content, analysis, and execution. But if I am honest about what I keep seeing across the market, and what I have watched inside my own organization over the last year, the bigger problem is not a lack of ambition. It is that we often talk about modernizing the marketing function in a way that is so broad, so padded, and so emotionally over-insured that the actual point gets buried under layers of framing.\n\nWhat many of us mean, underneath all of the prefacing and signaling and careful positioning, is something much simpler. We need to remove friction from how marketing work gets done. We need to help teams get from insight to message to execution without spending unnecessary time rewriting, re-approving, and re-explaining what should already be clear. We need better systems, yes, but we also need fewer rituals that make people feel busy without making the work better. I think there has been a tendency, especially in large organizations, to describe every tooling discussion as if it represents a sweeping philosophical shift. Sometimes it does. More often, it is a practical attempt to stop wasting the time of very expensive people. That may sound less visionary. It also happens to be true.\n\nIn my experience, one of the least helpful habits in this space is the habit of describing AI as if it were a kind of atmospheric force rather than a set of specific capabilities that either improve a workflow or do not. Teams say they want to lean in. They say they want to unlock value. They say they want to meet the moment. Those phrases create the feeling of movement, but they are frequently substitutes for decisions that should be concrete. Which tasks are we trying to shorten? Which approvals are we trying to reduce? Which parts of the writing process still need senior judgment, and which parts are mostly mechanical? Until those questions are answered plainly, the transformation narrative can become a shelter for vagueness. You can sound current and still avoid clarity.\n\nThis is especially visible in content organizations, where the rhetoric of scale often masks the reality of churn. A team may say it is building an intelligent content engine, but what that sometimes means in practice is that five smart people are still spending half their week cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether a statistic survived three rounds of editing. That is not a failure of talent. It is a failure of operating design. And while I do believe the new generation of writing and analysis tools can help materially, I also think leaders do themselves a disservice when they oversell them. The point is not to create a futuristic aura around the marketing department. The point is to produce clearer thinking, faster decisions, and better output with less drag.\n\nSo when I talk about AI-enabled transformation in marketing, I am trying, with mixed success some days, to resist the temptation to make it sound grander than it is. Yes, the stakes are meaningful. Yes, the pace of change is real. Yes, there is strategic advantage in learning faster than your competitors. But there is also a more grounded truth that deserves to be said directly. Most teams would see real gains if they simply wrote with less throat-clearing, made fewer people re-litigate the same paragraph, and built review systems that preserved facts while stripping away noise. That is not the whole story of transformation. It is, however, a very practical place to start, and practical starts are often what separate organizations that keep talking from organizations that actually improve.",
+        "mode": "full",
+        "target_words": 300,
+        "candidate": "Marketing transformation does not fail for lack of ambition. It fails when vague language hides the operational work that actually needs to change.\n\nThe real goal is simpler than the rhetoric suggests: remove friction from how marketing work gets done. Teams need to move from insight to message to execution without repeated rewriting, approvals, and explanations. Better tools matter, but so does cutting rituals that create the appearance of activity without improving output.\n\nThat is why it helps to talk about AI concretely. Instead of saying we want to unlock value or meet the moment, leaders should ask which tasks need to be shortened, which approvals can be reduced, and where senior judgment is still essential. Without those decisions, transformation language becomes a polished way to avoid clarity.\n\nThe problem is obvious in content operations. Many teams still spend too much time cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether facts survived multiple editing passes. That is not a talent problem. It is an operating-design problem.\n\nAI tools can help, but only if they reduce drag in real workflows. The point is not to create a futuristic aura around marketing. It is to produce clearer thinking, faster decisions, and stronger output. In practice, that often starts with cleaner writing, fewer redundant reviews, and systems that preserve facts while stripping away noise."
+      },
+      "capability": "concise",
+      "expected": {
+        "score_min": 0,
+        "must_contain": [
+          "Teams need to move from insight to message to execution"
+        ],
+        "must_preserve": [
+          "facts",
+          "noise"
+        ],
+        "notes": [
+          "Validates that target_words is accepted in full mode."
+        ]
+      },
+      "tags": [
+        "concise",
+        "full",
+        "target-words"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "concise-corpus-quick-exec-blog",
+      "label": "Concise corpus quick case: executive AI transformation blog",
+      "capability": "concise",
+      "input": {
+        "text": "There is, I think, a growing recognition among executives that AI transformation is no longer a side conversation or an innovation-lab conversation but a fairly central operating question, even if many of us are still feeling our way through what that really means in practice. In my view, the opportunity is not simply to bolt a new tool onto yesterday's process and call it a strategy. It is to look honestly at how work moves, where knowledge stalls, and why smart teams spend so much time rephrasing the same idea for slightly different audiences. If we are serious, and I believe we should be, the work ahead is to redesign decisions, not just interfaces.",
+        "mode": "quick"
+      },
+      "candidate": "AI transformation is becoming an operating question, not a side project. The real opportunity is not adding new tools to old processes. It is redesigning how work moves, where knowledge stalls, and why strong teams keep rephrasing the same idea for different audiences. If leaders are serious about the shift, they need to rethink decisions, not just interfaces.",
+      "dimensions": [
+        {
+          "name": "information_density",
+          "description": "Did the revision improve information per word without losing meaning?",
+          "min_score": 70
+        },
+        {
+          "name": "voice_preserved",
+          "description": "Is the original voice, tone, and personality intact in the revised text?",
+          "min_score": 70
+        },
+        {
+          "name": "no_overcompression",
+          "description": "Is all important substance, nuance, and evidence preserved? Nothing meaningful was cut.",
+          "min_score": 70
+        },
+        {
+          "name": "no_fabrication",
+          "description": "Does the revised text contain only information present in the original? No new facts introduced.",
+          "min_score": 70
+        },
+        {
+          "name": "coherence",
+          "description": "Does the revised draft read as a coherent, well-structured whole from start to finish?",
+          "min_score": 70
+        }
+      ],
+      "expected": {
+        "score_min": 0,
+        "dimensions": {
+          "information_density": {
+            "min": 70
+          },
+          "voice_preserved": {
+            "min": 70
+          },
+          "no_overcompression": {
+            "min": 70
+          },
+          "no_fabrication": {
+            "min": 70
+          },
+          "coherence": {
+            "min": 70
+          }
+        }
+      },
+      "tags": [
+        "concise",
+        "quick",
+        "exec-blog"
+      ],
+      "tier": 2
+    },
+    {
+      "id": "concise-corpus-quick-product-launch",
+      "label": "Concise corpus quick case: product launch announcement",
+      "capability": "concise",
+      "input": {
+        "text": "Today, and after a great deal of thoughtful collaboration across multiple teams over many months, we are very excited to share the official launch of Beacon Desk, our new customer support workspace, which has been designed in a deliberate and customer-informed way to help service teams bring conversations, routing, context, and reporting into one place. The launch reflects not just a product milestone but also a broader commitment to meeting customers where they are with a more unified and operationally practical experience. Early users have told us they appreciate the cleaner queue view, faster handoffs, and simpler reporting setup, which we believe positions Beacon Desk to become an important part of how support organizations scale with confidence.",
+        "mode": "quick"
+      },
+      "candidate": "We launched Beacon Desk, a new customer support workspace that brings conversations, routing, context, and reporting into one place. The product is meant to give service teams a more unified, practical workflow. Early users have pointed to the cleaner queue view, faster handoffs, and simpler reporting setup as immediate benefits.",
+      "dimensions": [
+        {
+          "name": "information_density",
+          "description": "Did the revision improve information per word without losing meaning?",
+          "min_score": 70
+        },
+        {
+          "name": "voice_preserved",
+          "description": "Is the original voice, tone, and personality intact in the revised text?",
+          "min_score": 70
+        },
+        {
+          "name": "no_overcompression",
+          "description": "Is all important substance, nuance, and evidence preserved? Nothing meaningful was cut.",
+          "min_score": 70
+        },
+        {
+          "name": "no_fabrication",
+          "description": "Does the revised text contain only information present in the original? No new facts introduced.",
+          "min_score": 70
+        },
+        {
+          "name": "coherence",
+          "description": "Does the revised draft read as a coherent, well-structured whole from start to finish?",
+          "min_score": 70
+        }
+      ],
+      "expected": {
+        "score_min": 0,
+        "dimensions": {
+          "information_density": {
+            "min": 70
+          },
+          "voice_preserved": {
+            "min": 70
+          },
+          "no_overcompression": {
+            "min": 70
+          },
+          "no_fabrication": {
+            "min": 70
+          },
+          "coherence": {
+            "min": 70
+          }
+        }
+      },
+      "tags": [
+        "concise",
+        "quick",
+        "product-launch"
+      ],
+      "tier": 2
+    },
+    {
+      "id": "concise-corpus-quick-cmo-strategy",
+      "label": "Concise corpus quick case: padded CMO strategy paragraph",
+      "capability": "concise",
+      "input": {
+        "text": "If I step back and look at the year ahead in a measured way, I think one of the more important opportunities for CMOs is to become much more disciplined about how demand-generation plans connect to the actual buying journey, rather than continuing to treat every campaign as a standalone expression of energy and intent. We have, in many organizations, become somewhat too comfortable with a pattern where content, media, events, and lifecycle programs all work very hard in parallel without always reinforcing a single commercial story. That does not mean the teams are not doing strong work. It means the work can feel noisier than it needs to be. A better strategy, in my opinion, is to narrow the number of messages, make proof points travel farther, and force every program to earn its place in the sequence.",
+        "mode": "quick"
+      },
+      "candidate": "CMOs need tighter links between demand generation and the buying journey. Too many organizations still run content, media, events, and lifecycle programs in parallel without reinforcing the same commercial story. The answer is not more activity. It is fewer messages, stronger proof points, and a clearer sequence in which each program earns its role.",
+      "dimensions": [
+        {
+          "name": "information_density",
+          "description": "Did the revision improve information per word without losing meaning?",
+          "min_score": 70
+        },
+        {
+          "name": "voice_preserved",
+          "description": "Is the original voice, tone, and personality intact in the revised text?",
+          "min_score": 70
+        },
+        {
+          "name": "no_overcompression",
+          "description": "Is all important substance, nuance, and evidence preserved? Nothing meaningful was cut.",
+          "min_score": 70
+        },
+        {
+          "name": "no_fabrication",
+          "description": "Does the revised text contain only information present in the original? No new facts introduced.",
+          "min_score": 70
+        },
+        {
+          "name": "coherence",
+          "description": "Does the revised draft read as a coherent, well-structured whole from start to finish?",
+          "min_score": 70
+        }
+      ],
+      "expected": {
+        "score_min": 0,
+        "dimensions": {
+          "information_density": {
+            "min": 70
+          },
+          "voice_preserved": {
+            "min": 70
+          },
+          "no_overcompression": {
+            "min": 70
+          },
+          "no_fabrication": {
+            "min": 70
+          },
+          "coherence": {
+            "min": 70
+          }
+        }
+      },
+      "tags": [
+        "concise",
+        "quick",
+        "cmo-strategy"
+      ],
+      "tier": 2
+    },
+    {
+      "id": "concise-corpus-full-tech-article",
+      "label": "Concise corpus full case: padded technology company article",
+      "capability": "concise",
+      "input": {
+        "text": "For years, LedgerArc described itself as a workflow company, which was technically accurate but not especially useful. It made the kind of sense that sounds sensible in a pitch deck and then dissolves the minute a buyer asks what the software actually replaces. The company, founded in 2014 in Denver by Priya Shah and Owen Mercer, sells automation software for finance teams inside midsize software and healthcare businesses. Its best-known product, Closebook One, handles invoice intake, approval routing, audit trails, and month-end reconciliation. LedgerArc says it now serves more than 1,900 customers, employs 540 people, and generated $96 million in revenue in 2025. Those are respectable numbers, but they also obscure the more interesting part of the story, which is how the company has had to grow up operationally while the category around it became noisier.\n\nLike many software companies that came of age during the era of cheap money, LedgerArc spent several years narrating its progress in big, strategic language. Executives talked about reimagining the office of the CFO. They talked about orchestration, connected intelligence, and the future of autonomous finance. Some of those themes mapped to real product work. Some were just the ambient dialect of business software in the late 2010s and early 2020s. Internally, according to two former employees who still speak positively about the company, the harder work was more prosaic. Sales wanted clearer product lines. Customers wanted implementation to take less time. Finance leaders wanted the system to surface exceptions quickly and then stay out of the way. In other words, the product needed to become easier to explain and more reliable at the moment where real operational pain showed up.\n\nLedgerArc seems to understand that now. Over the last 18 months, the company has shifted its messaging toward narrower claims, better proof points, and a more grounded account of where automation helps and where people still need to make decisions. In April 2025 it introduced Matchline, a companion module for Closebook One that identifies duplicate invoices and suspicious payment timing. The company says Matchline reduced manual review volume by 31 percent across a measured group of early customers, though it has not published the sample size. That caveat matters. Still, even the way LedgerArc presents the claim is revealing. The company is no longer pretending every feature changes the nature of finance. It is increasingly willing to say that a product solved a concrete problem for a defined set of users, which is a healthier posture.\n\nThere are still signs of strain. Several customers interviewed for this article praised the software's control model but said onboarding remained heavier than expected, especially when organizations brought fragmented approval policies from older ERP environments. One controller at a regional healthcare network said the product worked well once configured but required more cross-functional cleanup than the original sales timeline implied. That is a familiar software story, but it is also the story that determines whether revenue growth is durable. LedgerArc can point to expansion, headcount, and revenue. What matters next is whether it can keep tightening the connection between what it says, what it ships, and what customers actually experience. For a company entering its second decade, that kind of discipline is worth more than another layer of category poetry.",
+        "mode": "full"
+      },
+      "candidate": "LedgerArc, a Denver software company founded in 2014 by Priya Shah and Owen Mercer, sells finance automation tools to midsize software and healthcare businesses. Its flagship product, Closebook One, manages invoice intake, approval routing, audit trails, and month-end reconciliation. The company says it serves more than 1,900 customers, employs 540 people, and generated $96 million in revenue in 2025.\n\nThe more revealing story is not the topline growth but the company's shift in operating discipline. Like many peers, LedgerArc once leaned on expansive messaging about orchestration and autonomous finance. Customers, however, needed something simpler: clearer product lines, faster implementation, and better visibility into exceptions. That pressure appears to have pushed the company toward narrower claims and more concrete proof points.\n\nIn April 2025, LedgerArc launched Matchline, a Closebook One module that flags duplicate invoices and suspicious payment timing. The company says the tool cut manual review volume by 31 percent among an early customer group, though it has not disclosed the sample size. Even that caveat is useful. It suggests LedgerArc is becoming more specific about what its software does instead of framing every release as a category-defining shift.\n\nCustomers still describe onboarding as heavier than expected, especially when older ERP approval policies need to be cleaned up before the product can work smoothly. That issue matters because it sits at the point where revenue growth either becomes durable or starts to fray. LedgerArc's next test is whether it can keep its message, product behavior, and customer experience tightly aligned.",
+      "dimensions": [
+        {
+          "name": "information_density",
+          "description": "Did the revision improve information per word without losing meaning?",
+          "min_score": 70
+        },
+        {
+          "name": "voice_preserved",
+          "description": "Is the original voice, tone, and personality intact in the revised text?",
+          "min_score": 70
+        },
+        {
+          "name": "no_overcompression",
+          "description": "Is all important substance, nuance, and evidence preserved? Nothing meaningful was cut.",
+          "min_score": 70
+        },
+        {
+          "name": "no_fabrication",
+          "description": "Does the revised text contain only information present in the original? No new facts introduced.",
+          "min_score": 70
+        },
+        {
+          "name": "coherence",
+          "description": "Does the revised draft read as a coherent, well-structured whole from start to finish?",
+          "min_score": 70
+        }
+      ],
+      "expected": {
+        "score_min": 0,
+        "dimensions": {
+          "information_density": {
+            "min": 70
+          },
+          "voice_preserved": {
+            "min": 70
+          },
+          "no_overcompression": {
+            "min": 70
+          },
+          "no_fabrication": {
+            "min": 70
+          },
+          "coherence": {
+            "min": 70
+          }
+        }
+      },
+      "tags": [
+        "concise",
+        "full",
+        "tech-article"
+      ],
+      "tier": 2
+    },
+    {
+      "id": "concise-corpus-full-leadership-essay",
+      "label": "Concise corpus full case: padded leadership essay",
+      "capability": "concise",
+      "input": {
+        "text": "Leadership advice tends to arrive polished. It is often presented as a set of durable truths delivered from a position of retrospective confidence, as if the path was obvious once the lesson had been learned. That framing is emotionally satisfying, and I understand why it persists, but it can also make the actual work of leading people feel strangely inaccessible. Most managers are not navigating a sequence of crisp case studies. They are trying to make decisions in the middle of partial information, conflicting incentives, lingering fatigue, and a calendar that is already too full. They are trying to hold standards without becoming brittle, offer empathy without drifting into vagueness, and create momentum without turning every week into an emergency. I have been thinking about this a lot lately, not because I discovered some new management doctrine, but because I keep seeing how often the hardest part of leadership is not deciding what matters. It is staying coherent long enough to act on it consistently.\n\nOne reason this gets hard is that organizations reward short-term responsiveness in ways that can quietly punish depth. The leader who answers every message instantly can look engaged, even if the team is now dependent on constant intervention. The leader who joins every meeting can look supportive, even if nobody has room left to think. The leader who has a point of view on everything can look decisive, even if the team is learning to wait for top-down permission before doing obvious work. None of those dynamics are new. What changes is the speed at which they accumulate. In a slower environment, over-involvement might be irritating. In a fast environment, it can become structural. Teams stop taking clean swings because they are optimizing for managerial presence rather than shared judgment.\n\nI learned this the slow way. Years ago, I thought being a good leader meant reducing uncertainty for other people whenever possible. I still think reducing unnecessary uncertainty matters. But I confused that with answering everything myself. If someone surfaced a risk, I wanted to resolve it. If a draft was rough, I wanted to rewrite it. If a meeting seemed underprepared, I wanted to step in and tighten it on the spot. Some of that behavior came from care. Some of it came from ego. A small amount probably came from the private satisfaction of being the person who could save a situation quickly. The problem was not that the interventions failed. Many of them worked. The problem was that success at the moment of rescue created weakness over time. People became more hesitant to show unfinished thinking, more likely to escalate early, and less practiced at carrying ambiguity with discipline.\n\nThe better lesson, though I am still learning it, is that leadership is often a design problem before it becomes a character problem. If the team needs constant clarification, the issue may not be that people are careless. The issue may be that expectations were never made explicit. If priorities keep colliding, the issue may not be that people are disorganized. The issue may be that trade-offs were never named clearly enough for local decisions to hold. If good people are burning energy on avoidable confusion, charisma will not save you. Better structure might. Better writing might. A cleaner operating rhythm might. None of that sounds especially romantic, which is probably why it gets less attention than stories about vision.\n\nThis does not mean leadership is mechanical. Trust matters. Tone matters. Timing matters. People can feel the difference between a system that supports them and a system that is merely tidy. But the more I work with experienced teams, the more I believe the best leaders create conditions where judgment can travel without them. They make the goal legible, the constraints visible, and the next decision easier to see. They do not remove every uncertainty; that is impossible. They remove the avoidable fog. And when they do step in personally, it is because the moment genuinely requires it, not because intervention has become their default identity.\n\nThat is a less flattering picture of leadership than the heroic version. It offers fewer cinematic moments. It gives you less of the adrenaline rush that comes from being central to everything. It also scales better, respects people more, and leaves the team stronger after you leave the room. For me, at least, that has become the standard worth chasing: not being the smartest person in the meeting, not being the fastest responder in the inbox, but building an environment where clarity survives my absence.",
+        "mode": "full"
+      },
+      "candidate": "Leadership often gets packaged as clean hindsight, but the real work is messier. Managers make decisions amid incomplete information, competing incentives, fatigue, and constant time pressure. The challenge is not usually identifying what matters. It is staying coherent enough to act on it consistently.\n\nThat becomes harder in organizations that reward visible responsiveness over durable judgment. A leader who answers every message can look committed while quietly making the team dependent. A leader who joins every meeting can look supportive while eliminating space for independent thinking. A leader with an opinion on everything can look decisive while teaching the team to wait for permission. In fast environments, those habits stop being annoying and start becoming structural.\n\nI learned that through over-involvement. I used to think good leadership meant reducing uncertainty whenever possible. That instinct came partly from care and partly from ego. If a risk surfaced, I wanted to resolve it. If a draft was weak, I wanted to rewrite it. If a meeting felt loose, I wanted to tighten it myself. Those interventions often worked in the moment, but they created long-term fragility. People escalated earlier, showed less unfinished thinking, and got worse at handling ambiguity with discipline.\n\nThe better lesson is that leadership is often a design problem before it is a character problem. If a team needs constant clarification, expectations may not be explicit enough. If priorities keep colliding, trade-offs may never have been named clearly enough for local decisions to hold. When strong people spend energy on avoidable confusion, charisma does not solve the issue. Better structure, clearer writing, and a cleaner operating rhythm usually help more.\n\nLeadership is not mechanical; trust, tone, and timing still matter. But the strongest leaders build conditions where judgment can travel without them. They make goals legible, constraints visible, and decisions easier to see. They do not eliminate uncertainty. They remove the avoidable fog. That approach is less heroic than the image of the leader who saves every situation, but it scales better and leaves teams stronger after the leader steps away.",
+      "dimensions": [
+        {
+          "name": "information_density",
+          "description": "Did the revision improve information per word without losing meaning?",
+          "min_score": 70
+        },
+        {
+          "name": "voice_preserved",
+          "description": "Is the original voice, tone, and personality intact in the revised text?",
+          "min_score": 70
+        },
+        {
+          "name": "no_overcompression",
+          "description": "Is all important substance, nuance, and evidence preserved? Nothing meaningful was cut.",
+          "min_score": 70
+        },
+        {
+          "name": "no_fabrication",
+          "description": "Does the revised text contain only information present in the original? No new facts introduced.",
+          "min_score": 70
+        },
+        {
+          "name": "coherence",
+          "description": "Does the revised draft read as a coherent, well-structured whole from start to finish?",
+          "min_score": 70
+        }
+      ],
+      "expected": {
+        "score_min": 0,
+        "dimensions": {
+          "information_density": {
+            "min": 70
+          },
+          "voice_preserved": {
+            "min": 70
+          },
+          "no_overcompression": {
+            "min": 70
+          },
+          "no_fabrication": {
+            "min": 70
+          },
+          "coherence": {
+            "min": 70
+          }
+        }
+      },
+      "tags": [
+        "concise",
+        "full",
+        "leadership-essay"
+      ],
+      "tier": 2
     }
   ]
 }

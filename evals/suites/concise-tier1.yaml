@@ -60,3 +60,155 @@
     schema_valid: true
     output_present: true
     no_fabrication: true
+
+- id: concise-full-mode-long
+  capability: concise
+  input:
+    text: |-
+      If you spend any amount of time in boardrooms, planning off-sites, or the increasingly crowded overlap between marketing and technology leadership, you will probably hear a familiar refrain about transformation. It tends to arrive wrapped in a language of momentum, acceleration, possibility, and strategic urgency. And, to be fair, some of that language reflects something real. The environment is moving. Customer expectations are shifting. AI systems are changing the economics of content, analysis, and execution. But if I am honest about what I keep seeing across the market, and what I have watched inside my own organization over the last year, the bigger problem is not a lack of ambition. It is that we often talk about modernizing the marketing function in a way that is so broad, so padded, and so emotionally over-insured that the actual point gets buried under layers of framing.
+      
+      What many of us mean, underneath all of the prefacing and signaling and careful positioning, is something much simpler. We need to remove friction from how marketing work gets done. We need to help teams get from insight to message to execution without spending unnecessary time rewriting, re-approving, and re-explaining what should already be clear. We need better systems, yes, but we also need fewer rituals that make people feel busy without making the work better. I think there has been a tendency, especially in large organizations, to describe every tooling discussion as if it represents a sweeping philosophical shift. Sometimes it does. More often, it is a practical attempt to stop wasting the time of very expensive people. That may sound less visionary. It also happens to be true.
+      
+      In my experience, one of the least helpful habits in this space is the habit of describing AI as if it were a kind of atmospheric force rather than a set of specific capabilities that either improve a workflow or do not. Teams say they want to lean in. They say they want to unlock value. They say they want to meet the moment. Those phrases create the feeling of movement, but they are frequently substitutes for decisions that should be concrete. Which tasks are we trying to shorten? Which approvals are we trying to reduce? Which parts of the writing process still need senior judgment, and which parts are mostly mechanical? Until those questions are answered plainly, the transformation narrative can become a shelter for vagueness. You can sound current and still avoid clarity.
+      
+      This is especially visible in content organizations, where the rhetoric of scale often masks the reality of churn. A team may say it is building an intelligent content engine, but what that sometimes means in practice is that five smart people are still spending half their week cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether a statistic survived three rounds of editing. That is not a failure of talent. It is a failure of operating design. And while I do believe the new generation of writing and analysis tools can help materially, I also think leaders do themselves a disservice when they oversell them. The point is not to create a futuristic aura around the marketing department. The point is to produce clearer thinking, faster decisions, and better output with less drag.
+      
+      So when I talk about AI-enabled transformation in marketing, I am trying, with mixed success some days, to resist the temptation to make it sound grander than it is. Yes, the stakes are meaningful. Yes, the pace of change is real. Yes, there is strategic advantage in learning faster than your competitors. But there is also a more grounded truth that deserves to be said directly. Most teams would see real gains if they simply wrote with less throat-clearing, made fewer people re-litigate the same paragraph, and built review systems that preserved facts while stripping away noise. That is not the whole story of transformation. It is, however, a very practical place to start, and practical starts are often what separate organizations that keep talking from organizations that actually improve.
+    mode: "full"
+    candidate: |-
+      Marketing transformation does not fail for lack of ambition. It fails when vague language hides the operational work that actually needs to change.
+      
+      The real goal is simpler than the rhetoric suggests: remove friction from how marketing work gets done. Teams need to move from insight to message to execution without repeated rewriting, approvals, and explanations. Better tools matter, but so does cutting rituals that create the appearance of activity without improving output.
+      
+      That is why it helps to talk about AI concretely. Instead of saying we want to unlock value or meet the moment, leaders should ask which tasks need to be shortened, which approvals can be reduced, and where senior judgment is still essential. Without those decisions, transformation language becomes a polished way to avoid clarity.
+      
+      The problem is obvious in content operations. Many teams still spend too much time cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether facts survived multiple editing passes. That is not a talent problem. It is an operating-design problem.
+      
+      AI tools can help, but only if they reduce drag in real workflows. The point is not to create a futuristic aura around marketing. It is to produce clearer thinking, faster decisions, and stronger output. In practice, that often starts with cleaner writing, fewer redundant reviews, and systems that preserve facts while stripping away noise.
+  expect:
+    schema_valid: true
+    output_present: true
+    word_count_reduced: true
+
+- id: concise-full-mode-fact-preservation
+  capability: concise
+  input:
+    text: |-
+      Northshore Systems has spent most of the last decade trying to outgrow the category labels that followed it after its early warehouse software success. The Toronto company was founded in 2011 by Elena Park and Martin Hale, who had previously worked on supply-chain analytics projects for retail and manufacturing clients across Ontario. At launch, the company had eight employees in a small office near King Street West. Today it reports 640 employees, with major teams in Toronto, Chicago, and Dublin, and a customer base that includes logistics operators, regional grocers, and industrial distributors. According to the company, fiscal 2025 revenue reached $148 million, up from $121 million a year earlier. The flagship product, Railhouse Cloud, is used to manage forecasting, purchasing, and exception reporting across multi-site inventory networks.
+      
+      Northshore's current expansion strategy dates back to March 14, 2023, when chief executive Elena Park told analysts in Boston that the company would move more aggressively into midmarket manufacturing accounts. The company opened its Chicago office on June 5, 2023, and announced the Dublin location on January 18, 2024, saying the European team would support customers in Ireland, Germany, and the Netherlands. Northshore says its software now processes more than 92 million inventory events each month. In November 2024, it launched Railhouse Signal, a monitoring layer designed to flag disruptions caused by late shipments, supplier outages, and unusual demand swings before planners feel the effect downstream.
+      
+      That growth has not been entirely smooth. During a customer event in Austin on September 9, 2025, Park acknowledged that the company had underestimated onboarding complexity for clients with older ERP systems. She said some deployments that had been scoped for 14 weeks were taking closer to 20. Even so, Northshore retained 96 percent of its revenue base last year, according to figures shared with customers and partners at the event. Chief financial officer Daniel Ruiz said the company expects hiring to remain disciplined in 2026, with most new roles concentrated in implementation, product support, and applied data science rather than general administration.
+      
+      Investors and customers are watching to see whether Northshore can maintain that balance: enough product ambition to keep growing, but enough operational discipline to avoid the sprawl that has slowed larger competitors. The company plans to hold its next customer summit in Chicago on May 12, 2026. For now, the story is less about hype than execution. Northshore has specific products, named leaders, disclosed expansion dates, and a clear record of where the business is gaining traction and where it is still working through friction.
+    mode: "full"
+    candidate: |-
+      Northshore Systems, founded in Toronto in 2011 by Elena Park and Martin Hale, has grown from an eight-person startup near King Street West to a 640-employee software company with teams in Toronto, Chicago, and Dublin. The company said fiscal 2025 revenue reached $148 million, up from $121 million the year before. Its flagship product, Railhouse Cloud, supports forecasting, purchasing, and exception reporting, and Northshore added Railhouse Signal in November 2024 to flag disruptions across inventory networks.
+      
+      The company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023. Northshore opened its Chicago office on June 5, 2023, announced Dublin on January 18, 2024, and says the platform now processes more than 92 million inventory events each month.
+      
+      Park said in Austin on September 9, 2025 that onboarding clients with older ERP systems had taken longer than expected, with some projects stretching from 14 weeks to about 20. Even so, Northshore said it retained 96 percent of its revenue base last year. CFO Daniel Ruiz said 2026 hiring would stay focused on implementation, product support, and applied data science. The next customer summit is scheduled for Chicago on May 12, 2026.
+  expect:
+    schema_valid: true
+    output_present: true
+    no_fabrication: true
+
+- id: concise-full-mode-never-fail
+  capability: concise
+  input:
+    text: |-
+      If you spend any amount of time in boardrooms, planning off-sites, or the increasingly crowded overlap between marketing and technology leadership, you will probably hear a familiar refrain about transformation. It tends to arrive wrapped in a language of momentum, acceleration, possibility, and strategic urgency. And, to be fair, some of that language reflects something real. The environment is moving. Customer expectations are shifting. AI systems are changing the economics of content, analysis, and execution. But if I am honest about what I keep seeing across the market, and what I have watched inside my own organization over the last year, the bigger problem is not a lack of ambition. It is that we often talk about modernizing the marketing function in a way that is so broad, so padded, and so emotionally over-insured that the actual point gets buried under layers of framing.
+      
+      What many of us mean, underneath all of the prefacing and signaling and careful positioning, is something much simpler. We need to remove friction from how marketing work gets done. We need to help teams get from insight to message to execution without spending unnecessary time rewriting, re-approving, and re-explaining what should already be clear. We need better systems, yes, but we also need fewer rituals that make people feel busy without making the work better. I think there has been a tendency, especially in large organizations, to describe every tooling discussion as if it represents a sweeping philosophical shift. Sometimes it does. More often, it is a practical attempt to stop wasting the time of very expensive people. That may sound less visionary. It also happens to be true.
+      
+      In my experience, one of the least helpful habits in this space is the habit of describing AI as if it were a kind of atmospheric force rather than a set of specific capabilities that either improve a workflow or do not. Teams say they want to lean in. They say they want to unlock value. They say they want to meet the moment. Those phrases create the feeling of movement, but they are frequently substitutes for decisions that should be concrete. Which tasks are we trying to shorten? Which approvals are we trying to reduce? Which parts of the writing process still need senior judgment, and which parts are mostly mechanical? Until those questions are answered plainly, the transformation narrative can become a shelter for vagueness. You can sound current and still avoid clarity.
+      
+      This is especially visible in content organizations, where the rhetoric of scale often masks the reality of churn. A team may say it is building an intelligent content engine, but what that sometimes means in practice is that five smart people are still spending half their week cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether a statistic survived three rounds of editing. That is not a failure of talent. It is a failure of operating design. And while I do believe the new generation of writing and analysis tools can help materially, I also think leaders do themselves a disservice when they oversell them. The point is not to create a futuristic aura around the marketing department. The point is to produce clearer thinking, faster decisions, and better output with less drag.
+      
+      So when I talk about AI-enabled transformation in marketing, I am trying, with mixed success some days, to resist the temptation to make it sound grander than it is. Yes, the stakes are meaningful. Yes, the pace of change is real. Yes, there is strategic advantage in learning faster than your competitors. But there is also a more grounded truth that deserves to be said directly. Most teams would see real gains if they simply wrote with less throat-clearing, made fewer people re-litigate the same paragraph, and built review systems that preserved facts while stripping away noise. That is not the whole story of transformation. It is, however, a very practical place to start, and practical starts are often what separate organizations that keep talking from organizations that actually improve.
+    mode: "full"
+    candidate: |-
+      Marketing transformation does not fail for lack of ambition. It fails when vague language hides the operational work that actually needs to change.
+      
+      The real goal is simpler than the rhetoric suggests: remove friction from how marketing work gets done. Teams need to move from insight to message to execution without repeated rewriting, approvals, and explanations. Better tools matter, but so does cutting rituals that create the appearance of activity without improving output.
+      
+      That is why it helps to talk about AI concretely. Instead of saying we want to unlock value or meet the moment, leaders should ask which tasks need to be shortened, which approvals can be reduced, and where senior judgment is still essential. Without those decisions, transformation language becomes a polished way to avoid clarity.
+      
+      The problem is obvious in content operations. Many teams still spend too much time cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether facts survived multiple editing passes. That is not a talent problem. It is an operating-design problem.
+      
+      AI tools can help, but only if they reduce drag in real workflows. The point is not to create a futuristic aura around marketing. It is to produce clearer thinking, faster decisions, and stronger output. In practice, that often starts with cleaner writing, fewer redundant reviews, and systems that preserve facts while stripping away noise.
+  expect:
+    output_present: true
+
+- id: concise-full-mode-schema
+  capability: concise
+  input:
+    text: |-
+      Northshore Systems has spent most of the last decade trying to outgrow the category labels that followed it after its early warehouse software success. The Toronto company was founded in 2011 by Elena Park and Martin Hale, who had previously worked on supply-chain analytics projects for retail and manufacturing clients across Ontario. At launch, the company had eight employees in a small office near King Street West. Today it reports 640 employees, with major teams in Toronto, Chicago, and Dublin, and a customer base that includes logistics operators, regional grocers, and industrial distributors. According to the company, fiscal 2025 revenue reached $148 million, up from $121 million a year earlier. The flagship product, Railhouse Cloud, is used to manage forecasting, purchasing, and exception reporting across multi-site inventory networks.
+      
+      Northshore's current expansion strategy dates back to March 14, 2023, when chief executive Elena Park told analysts in Boston that the company would move more aggressively into midmarket manufacturing accounts. The company opened its Chicago office on June 5, 2023, and announced the Dublin location on January 18, 2024, saying the European team would support customers in Ireland, Germany, and the Netherlands. Northshore says its software now processes more than 92 million inventory events each month. In November 2024, it launched Railhouse Signal, a monitoring layer designed to flag disruptions caused by late shipments, supplier outages, and unusual demand swings before planners feel the effect downstream.
+      
+      That growth has not been entirely smooth. During a customer event in Austin on September 9, 2025, Park acknowledged that the company had underestimated onboarding complexity for clients with older ERP systems. She said some deployments that had been scoped for 14 weeks were taking closer to 20. Even so, Northshore retained 96 percent of its revenue base last year, according to figures shared with customers and partners at the event. Chief financial officer Daniel Ruiz said the company expects hiring to remain disciplined in 2026, with most new roles concentrated in implementation, product support, and applied data science rather than general administration.
+      
+      Investors and customers are watching to see whether Northshore can maintain that balance: enough product ambition to keep growing, but enough operational discipline to avoid the sprawl that has slowed larger competitors. The company plans to hold its next customer summit in Chicago on May 12, 2026. For now, the story is less about hype than execution. Northshore has specific products, named leaders, disclosed expansion dates, and a clear record of where the business is gaining traction and where it is still working through friction.
+    mode: "full"
+    format: "json"
+    candidate: '{"agent":"corina-eval-fixture","capability":"concise","mode":"full","version":"fixture","timestamp":"2026-04-10T00:00:00.000Z","input_summary":"Offline fixture output for concise-full-mode-schema","artifact":{"mode":"full","original_word_count":648,"revised_word_count":290,"compression_ratio":0.45,"revised_draft":"Northshore Systems, founded in Toronto in 2011 by Elena Park and Martin Hale, has grown from an eight-person startup near King Street West to a 640-employee software company with teams in Toronto, Chicago, and Dublin. The company said fiscal 2025 revenue reached $148 million, up from $121 million the year before. Its flagship product, Railhouse Cloud, supports forecasting, purchasing, and exception reporting, and Northshore added Railhouse Signal in November 2024 to flag disruptions across inventory networks.\n\nThe company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023. Northshore opened its Chicago office on June 5, 2023, announced Dublin on January 18, 2024, and says the platform now processes more than 92 million inventory events each month.\n\nPark said in Austin on September 9, 2025 that onboarding clients with older ERP systems had taken longer than expected, with some projects stretching from 14 weeks to about 20. Even so, Northshore said it retained 96 percent of its revenue base last year. CFO Daniel Ruiz said 2026 hiring would stay focused on implementation, product support, and applied data science. The next customer summit is scheduled for Chicago on May 12, 2026.","heat_map":[{"tag":"THROAT_CLEARING","severity":"Moderate","count":3},{"tag":"REDUND","severity":"Major","count":4}],"revision_log":[{"id":"r1","original_excerpt":"The company''s current expansion strategy dates back to March 14, 2023...","tags":["REDUND"],"solution_move":"Condensed timeline details into a tighter chronology while preserving dates and names.","new_text":"The company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023.","scope":"Target"}],"preservation_check":{"facts":true,"nuance":true,"argument_function":true,"evidence":true,"tone_voice":true,"chronology":true},"unresolved_issues":[],"paragraph_function_map":[{"paragraph":"Paragraph 1","function":"Company overview and factual baseline","compression_priority":"Medium","revision_risk":"High risk","preservation_constraints":"Keep founding year, founders, employee count, locations, revenue, and product name."},{"paragraph":"Paragraph 2","function":"Expansion timeline and product launch","compression_priority":"High","revision_risk":"High risk","preservation_constraints":"Preserve all dates, locations, and the monthly inventory-event figure."},{"paragraph":"Paragraph 3","function":"Operational friction and retention context","compression_priority":"Medium","revision_risk":"High risk","preservation_constraints":"Retain Austin date, onboarding durations, retention rate, and Daniel Ruiz hiring plan."},{"paragraph":"Paragraph 4","function":"Conclusion and forward-looking framing","compression_priority":"Low","revision_risk":"Medium risk","preservation_constraints":"Keep Chicago summit date and execution framing."}],"reconciliation_log":[{"id":"c1","location":"Paragraph 2","issue_type":"chronology-tightening","what_changed":"Merged two expansion sentences into one timeline paragraph.","reason":"Reduced repetition while preserving named dates and locations."}]},"rendered":"## Concise Draft (mode: full, -55% words)\n\nNorthshore Systems, founded in Toronto in 2011 by Elena Park and Martin Hale, has grown from an eight-person startup near King Street West to a 640-employee software company with teams in Toronto, Chicago, and Dublin. The company said fiscal 2025 revenue reached $148 million, up from $121 million the year before. Its flagship product, Railhouse Cloud, supports forecasting, purchasing, and exception reporting, and Northshore added Railhouse Signal in November 2024 to flag disruptions across inventory networks.\n\nThe company tied its midmarket manufacturing push to remarks Park made in Boston on March 14, 2023. Northshore opened its Chicago office on June 5, 2023, announced Dublin on January 18, 2024, and says the platform now processes more than 92 million inventory events each month.\n\nPark said in Austin on September 9, 2025 that onboarding clients with older ERP systems had taken longer than expected, with some projects stretching from 14 weeks to about 20. Even so, Northshore said it retained 96 percent of its revenue base last year. CFO Daniel Ruiz said 2026 hiring would stay focused on implementation, product support, and applied data science. The next customer summit is scheduled for Chicago on May 12, 2026.\n\n---\nHeat Map: THROAT_CLEARING Moderate:3, REDUND Major:4\nCompression: 648 → 290 words (45%)"}'
+  expect:
+    schema_valid: true
+    json_parseable: true
+
+- id: concise-already-efficient
+  capability: concise
+  input:
+    text: |-
+      We cut the launch scope, fixed the checkout bug, and shipped on Friday. Support tickets stayed flat, conversion held, and the team documented the rollback path before release. It was a disciplined week, not a glamorous one, and that is exactly why the result held.
+    mode: "quick"
+    candidate: |-
+      We cut the launch scope, fixed the checkout bug, and shipped on Friday. Support tickets stayed flat, conversion held, and the team documented the rollback path before release. It was a disciplined week, not a glamorous one, and that is exactly why the result held.
+  expect:
+    schema_valid: true
+    output_present: true
+
+- id: concise-target-words-quick
+  capability: concise
+  input:
+    text: |-
+      Our team is, in many ways, really trying to move forward with a launch plan that feels genuinely thoughtful, carefully considered, and responsive to what customers have been saying over the last several weeks in meetings and feedback calls.
+    mode: "quick"
+    target_words: 50
+    candidate: |-
+      The team is moving forward with a thoughtful launch plan shaped by recent customer feedback.
+  expect:
+    schema_valid: true
+    output_present: true
+
+- id: concise-target-words-full
+  capability: concise
+  input:
+    text: |-
+      If you spend any amount of time in boardrooms, planning off-sites, or the increasingly crowded overlap between marketing and technology leadership, you will probably hear a familiar refrain about transformation. It tends to arrive wrapped in a language of momentum, acceleration, possibility, and strategic urgency. And, to be fair, some of that language reflects something real. The environment is moving. Customer expectations are shifting. AI systems are changing the economics of content, analysis, and execution. But if I am honest about what I keep seeing across the market, and what I have watched inside my own organization over the last year, the bigger problem is not a lack of ambition. It is that we often talk about modernizing the marketing function in a way that is so broad, so padded, and so emotionally over-insured that the actual point gets buried under layers of framing.
+      
+      What many of us mean, underneath all of the prefacing and signaling and careful positioning, is something much simpler. We need to remove friction from how marketing work gets done. We need to help teams get from insight to message to execution without spending unnecessary time rewriting, re-approving, and re-explaining what should already be clear. We need better systems, yes, but we also need fewer rituals that make people feel busy without making the work better. I think there has been a tendency, especially in large organizations, to describe every tooling discussion as if it represents a sweeping philosophical shift. Sometimes it does. More often, it is a practical attempt to stop wasting the time of very expensive people. That may sound less visionary. It also happens to be true.
+      
+      In my experience, one of the least helpful habits in this space is the habit of describing AI as if it were a kind of atmospheric force rather than a set of specific capabilities that either improve a workflow or do not. Teams say they want to lean in. They say they want to unlock value. They say they want to meet the moment. Those phrases create the feeling of movement, but they are frequently substitutes for decisions that should be concrete. Which tasks are we trying to shorten? Which approvals are we trying to reduce? Which parts of the writing process still need senior judgment, and which parts are mostly mechanical? Until those questions are answered plainly, the transformation narrative can become a shelter for vagueness. You can sound current and still avoid clarity.
+      
+      This is especially visible in content organizations, where the rhetoric of scale often masks the reality of churn. A team may say it is building an intelligent content engine, but what that sometimes means in practice is that five smart people are still spending half their week cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether a statistic survived three rounds of editing. That is not a failure of talent. It is a failure of operating design. And while I do believe the new generation of writing and analysis tools can help materially, I also think leaders do themselves a disservice when they oversell them. The point is not to create a futuristic aura around the marketing department. The point is to produce clearer thinking, faster decisions, and better output with less drag.
+      
+      So when I talk about AI-enabled transformation in marketing, I am trying, with mixed success some days, to resist the temptation to make it sound grander than it is. Yes, the stakes are meaningful. Yes, the pace of change is real. Yes, there is strategic advantage in learning faster than your competitors. But there is also a more grounded truth that deserves to be said directly. Most teams would see real gains if they simply wrote with less throat-clearing, made fewer people re-litigate the same paragraph, and built review systems that preserved facts while stripping away noise. That is not the whole story of transformation. It is, however, a very practical place to start, and practical starts are often what separate organizations that keep talking from organizations that actually improve.
+    mode: "full"
+    target_words: 300
+    candidate: |-
+      Marketing transformation does not fail for lack of ambition. It fails when vague language hides the operational work that actually needs to change.
+      
+      The real goal is simpler than the rhetoric suggests: remove friction from how marketing work gets done. Teams need to move from insight to message to execution without repeated rewriting, approvals, and explanations. Better tools matter, but so does cutting rituals that create the appearance of activity without improving output.
+      
+      That is why it helps to talk about AI concretely. Instead of saying we want to unlock value or meet the moment, leaders should ask which tasks need to be shortened, which approvals can be reduced, and where senior judgment is still essential. Without those decisions, transformation language becomes a polished way to avoid clarity.
+      
+      The problem is obvious in content operations. Many teams still spend too much time cleaning up bloated drafts, aligning tone, removing duplicate claims, and checking whether facts survived multiple editing passes. That is not a talent problem. It is an operating-design problem.
+      
+      AI tools can help, but only if they reduce drag in real workflows. The point is not to create a futuristic aura around marketing. It is to produce clearer thinking, faster decisions, and stronger output. In practice, that often starts with cleaner writing, fewer redundant reviews, and systems that preserve facts while stripping away noise.
+  expect:
+    schema_valid: true
+    output_present: true
+
