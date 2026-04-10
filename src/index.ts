@@ -3,11 +3,12 @@ import { tool } from "@opencode-ai/plugin";
 import type { StepModelConfig } from "opencode-model-resolver";
 
 import { writeAuditLog } from "./audit-log.js";
-import { runCritique } from "./critique.js";
+import { runCritiqueWithArtifact } from "./critique.js";
 import { runDetectWithArtifact } from "./detect.js";
+import { makeOpenCodeLogger } from "./logger.js";
 import { runPipelineWithArtifact } from "./pipeline.js";
 import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
-import type { PipelineModelConfig } from "./types.js";
+import type { AgentCapabilityOutput, AuditLogEntry, PipelineModelConfig } from "./types.js";
 
 function buildUniformModelConfig(modelPreset?: "fast" | "balanced" | "quality"): Partial<PipelineModelConfig> | undefined {
   if (!modelPreset) {
@@ -25,7 +26,30 @@ function buildUniformModelConfig(modelPreset?: "fast" | "balanced" | "quality"):
   };
 }
 
+function outputMetrics(output: AgentCapabilityOutput<unknown>): { total_tokens?: number; total_cost?: number } {
+  const metrics = (output as AgentCapabilityOutput<unknown> & { metrics?: { total_tokens?: number; total_cost?: number } }).metrics;
+  return {
+    total_tokens: metrics?.total_tokens,
+    total_cost: metrics?.total_cost,
+  };
+}
+
+function assumptionsCount(output: AgentCapabilityOutput<unknown>): number | undefined {
+  const assumptions = (output as AgentCapabilityOutput<unknown> & { assumptions?: string[] }).assumptions;
+  return assumptions?.length;
+}
+
+function writeCapabilityAudit(entry: Omit<AuditLogEntry, "timestamp" | "event">): void {
+  writeAuditLog({
+    timestamp: new Date().toISOString(),
+    event: "capability_complete",
+    ...entry,
+  });
+}
+
 export const CorinaPlugin: Plugin = async (input) => {
+  const logger = makeOpenCodeLogger(input.client, "corina");
+
   return {
     tool: {
       corina_write: tool({
@@ -40,19 +64,18 @@ export const CorinaPlugin: Plugin = async (input) => {
           format: tool.schema.string().optional().describe("Optional output format. Use json for the universal envelope."),
         },
         execute: async ({ brief, modelPreset, format }, toolCtx) => {
-          const output = await runPipelineWithArtifact(brief, input.client, buildUniformModelConfig(modelPreset));
+          const output = await runPipelineWithArtifact(brief, input.client, buildUniformModelConfig(modelPreset), logger);
           const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
-          writeAuditLog({
-            timestamp: new Date().toISOString(),
-            event: "corina_write",
-            sessionId: toolCtx.sessionID,
-            briefPreview: brief.slice(0, 160),
-            outcome: "completed",
-            metadata: {
-              outputLength: renderedOutput.length,
-              modelPreset,
-              format,
-            },
+          const metrics = outputMetrics(output);
+          writeCapabilityAudit({
+            capability: "pipeline",
+            session_id: toolCtx.sessionID,
+            input_summary: brief.slice(0, 160),
+            mode: modelPreset,
+            outcome: "success",
+            assumptions_count: assumptionsCount(output),
+            total_tokens: metrics.total_tokens,
+            total_cost: metrics.total_cost,
           });
           return renderedOutput;
         },
@@ -73,20 +96,18 @@ export const CorinaPlugin: Plugin = async (input) => {
         execute: async (args, toolCtx) => {
           const wantsJson = args.format === "json";
           const toneArgs = wantsJson ? { ...args, format: undefined } : args;
-          const output = await runTonePipelineWithArtifact(toneArgs, input.client);
+          const output = await runTonePipelineWithArtifact(toneArgs, input.client, logger);
           const renderedOutput = wantsJson ? JSON.stringify(output, null, 2) : output.rendered;
-          writeAuditLog({
-            timestamp: new Date().toISOString(),
-            event: "corina_tone",
-            sessionId: toolCtx.sessionID,
-            briefPreview: args.text.slice(0, 160),
-            outcome: "completed",
-            metadata: {
-              voice: args.voice,
-              format: args.format,
-              modelPreset: args.modelPreset,
-              validationScore: output.artifact.validation_score,
-            },
+          const metrics = outputMetrics(output);
+          writeCapabilityAudit({
+            capability: "tone",
+            session_id: toolCtx.sessionID,
+            input_summary: args.text.slice(0, 160),
+            mode: args.voice,
+            outcome: output.artifact.validation_score >= 70 ? "success" : "degraded",
+            assumptions_count: assumptionsCount(output),
+            total_tokens: metrics.total_tokens,
+            total_cost: metrics.total_cost,
           });
           return renderedOutput;
         },
@@ -103,23 +124,33 @@ export const CorinaPlugin: Plugin = async (input) => {
           modelPreset: tool.schema.string().optional(),
         },
         execute: async ({ text, format, autoFix, chain, voice, modelPreset }, toolCtx) => {
-          const output = await runDetectWithArtifact({ text, format: format as any, autoFix, chain: chain as any, voice, modelPreset }, input.client);
+          const output = await runDetectWithArtifact({ text, format: format as any, autoFix, chain: chain as any, voice, modelPreset }, input.client, logger);
           const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
-          writeAuditLog({
-            timestamp: new Date().toISOString(),
-            event: "corina_detect",
-            sessionId: toolCtx.sessionID,
-            briefPreview: text.slice(0, 160),
-            outcome: "completed",
-            metadata: {
-              format,
-              autoFix,
-              chain,
-              voice,
-              modelPreset,
-              outputLength: renderedOutput.length,
-            },
+          const metrics = outputMetrics(output);
+          writeCapabilityAudit({
+            capability: "detect",
+            session_id: toolCtx.sessionID,
+            input_summary: text.slice(0, 160),
+            mode: modelPreset,
+            outcome: output.artifact.verdict === "likely_ai" ? "degraded" : "success",
+            assumptions_count: assumptionsCount(output),
+            total_tokens: metrics.total_tokens,
+            total_cost: metrics.total_cost,
           });
+          if (chain || autoFix) {
+            writeAuditLog({
+              timestamp: new Date().toISOString(),
+              event: "chain_complete",
+              capability: "detect",
+              session_id: toolCtx.sessionID,
+              input_summary: text.slice(0, 160),
+              outcome: "success",
+              chain_target: autoFix ? "tone" : chain,
+              assumptions_count: assumptionsCount(output),
+              total_tokens: metrics.total_tokens,
+              total_cost: metrics.total_cost,
+            });
+          }
           return renderedOutput;
         },
       }),
@@ -137,29 +168,39 @@ export const CorinaPlugin: Plugin = async (input) => {
           voice: tool.schema.string().optional(),
         },
         async execute({ texts, mode, audience, rubric, chain, format, modelPreset, voice }, toolCtx) {
-          const renderedOutput = await runCritique(
+          const output = await runCritiqueWithArtifact(
             texts,
             { mode: mode as any, audience, rubric, chain: chain as any, format: format as any, modelPreset, voice },
             input.client,
+            logger,
           );
-          writeAuditLog({
-            timestamp: new Date().toISOString(),
-            event: "corina_critique",
-            sessionId: toolCtx.sessionID,
-            briefPreview: texts.join(" | ").slice(0, 160),
-            outcome: "completed",
-            metadata: {
-              count: texts.length,
-              mode,
-              audience,
-              rubric,
-              chain,
-              format,
-              modelPreset,
-              voice,
-              outputLength: renderedOutput.length,
-            },
+          const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
+          const metrics = outputMetrics(output);
+          writeCapabilityAudit({
+            capability: "critique",
+            session_id: toolCtx.sessionID,
+            input_summary: texts.join(" | ").slice(0, 160),
+            mode,
+            outcome: "success",
+            assumptions_count: assumptionsCount(output),
+            total_tokens: metrics.total_tokens,
+            total_cost: metrics.total_cost,
+            chain_target: chain,
           });
+          if (chain) {
+            writeAuditLog({
+              timestamp: new Date().toISOString(),
+              event: "chain_complete",
+              capability: "critique",
+              session_id: toolCtx.sessionID,
+              input_summary: texts.join(" | ").slice(0, 160),
+              outcome: "success",
+              chain_target: chain,
+              assumptions_count: assumptionsCount(output),
+              total_tokens: metrics.total_tokens,
+              total_cost: metrics.total_cost,
+            });
+          }
           return renderedOutput;
         },
       }),
@@ -176,9 +217,10 @@ export const CorinaPlugin: Plugin = async (input) => {
 
       writeAuditLog({
         timestamp: new Date().toISOString(),
-        event: "session.idle",
-        sessionId,
-        outcome: "idle",
+        event: "session_idle",
+        capability: "corina",
+        session_id: sessionId,
+        outcome: "success",
       });
     },
   };

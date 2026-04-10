@@ -4,6 +4,15 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createCapabilityOutput } from "./capability-output.js";
+import {
+  addLlmMetrics,
+  createUsageAccumulator,
+  errorDetails,
+  extractLlmMetrics,
+  makeConsoleLogger,
+  type AgentLogger,
+  type UsageAccumulator,
+} from "./logger.js";
 import { loadPrompt, promptExists, PROMPTS_DIR } from "./prompt-loader.js";
 import type {
   AgentCapabilityOutput,
@@ -229,6 +238,8 @@ function loadBrandProfile(profile?: string): { profile: BrandProfile | null; ass
 }
 
 function loadToneDescription(input: ToneRawInput): { toneDescription: string | null; assumptions: string[] } {
+  const startMs = Date.now();
+  const usage = createUsageAccumulator();
   const assumptions: string[] = [];
   const parts: string[] = [];
 
@@ -354,18 +365,27 @@ async function runWriter(
   client: OpenCodeClient,
   inputArtifact: ToneInputArtifact,
   voiceProfile: string,
-  extraInstructions?: string[],
+  extraInstructions: string[] | undefined,
+  logger: AgentLogger,
+  usage: UsageAccumulator,
 ): Promise<{ assumptions: string[]; rewrittenContent: string }> {
   const sessionResponse = await client.session.create({ body: { title: "Corina tone writer" } });
   const session = unwrapData<{ id: string }>(sessionResponse);
 
+  logger.debug("session_created", { capability: "tone", step: "rewrite", session_id: session.id, agent: "corina-tone-writer" });
+
   try {
-    await promptSession(client, session.id, {
+    const primerStartMs = Date.now();
+    const primerResult = await promptSession(client, session.id, {
       agent: "corina-tone-writer",
       noReply: true,
       parts: [{ type: "text", text: loadPrompt("tasks/tone-writer.md") }],
     });
+    const primerMetrics = extractLlmMetrics(primerResult, "rewrite_setup", primerStartMs);
+    addLlmMetrics(usage, primerMetrics);
+    logger.info("llm_call", { capability: "tone", ...primerMetrics });
 
+    const resultStartMs = Date.now();
     const result = await promptSession(client, session.id, {
       agent: "corina-tone-writer",
       parts: [
@@ -382,10 +402,17 @@ async function runWriter(
         },
       ],
     });
+    const resultMetrics = extractLlmMetrics(result, "rewrite", resultStartMs);
+    addLlmMetrics(usage, resultMetrics);
+    logger.info("llm_call", { capability: "tone", ...resultMetrics });
 
     return parseWriterResponse(extractText(unwrapData<any>(result)?.parts));
+  } catch (error) {
+    logger.error("step_error", { capability: "tone", step: "rewrite", session_id: session.id, degraded: false, ...errorDetails(error) });
+    throw error;
   } finally {
     await deleteSession(client, session.id);
+    logger.debug("session_deleted", { capability: "tone", step: "rewrite", session_id: session.id });
   }
 }
 
@@ -395,17 +422,26 @@ async function runValidator(
   rewrittenText: string,
   voice: ToneVoice,
   format: ToneFormat,
+  logger: AgentLogger,
+  usage: UsageAccumulator,
 ): Promise<ToneValidationArtifact> {
   const sessionResponse = await client.session.create({ body: { title: "Corina tone validator" } });
   const session = unwrapData<{ id: string }>(sessionResponse);
 
+  logger.debug("session_created", { capability: "tone", step: "validate", session_id: session.id, agent: "corina-tone-validator" });
+
   try {
-    await promptSession(client, session.id, {
+    const primerStartMs = Date.now();
+    const primerResult = await promptSession(client, session.id, {
       agent: "corina-tone-validator",
       noReply: true,
       parts: [{ type: "text", text: loadPrompt("tasks/tone-validator.md") }],
     });
+    const primerMetrics = extractLlmMetrics(primerResult, "validate_setup", primerStartMs);
+    addLlmMetrics(usage, primerMetrics);
+    logger.info("llm_call", { capability: "tone", ...primerMetrics });
 
+    const resultStartMs = Date.now();
     const result = await promptSession(client, session.id, {
       agent: "corina-tone-validator",
       parts: [
@@ -429,12 +465,17 @@ async function runValidator(
         retryCount: 2,
       },
     });
+    const resultMetrics = extractLlmMetrics(result, "validate", resultStartMs);
+    addLlmMetrics(usage, resultMetrics);
+    logger.info("llm_call", { capability: "tone", ...resultMetrics });
 
     return parseJsonText<ToneValidationArtifact>(result);
-  } catch {
+  } catch (error) {
+    logger.warn("partial_parse", { capability: "tone", step: "validate", degraded: true, ...errorDetails(error) });
     return localValidate(originalText, rewrittenText, voice, format);
   } finally {
     await deleteSession(client, session.id);
+    logger.debug("session_deleted", { capability: "tone", step: "validate", session_id: session.id });
   }
 }
 
@@ -481,10 +522,20 @@ function buildInputSummary(inputArtifact: ToneInputArtifact): string {
 export async function runTonePipelineWithArtifact(
   input: ToneRawInput,
   client: OpenCodeClient,
+  logger: AgentLogger = makeConsoleLogger("corina"),
 ): Promise<AgentCapabilityOutput<ToneOutputArtifact>> {
+  const startMs = Date.now();
+  const usage = createUsageAccumulator();
   const assumptions: string[] = [];
   const { text: sourceText, sourcePath } = maybeResolveTextInput(input.text);
   const originalText = cleanText(sourceText);
+
+  logger.info("capability_start", {
+    capability: "tone",
+    input_word_count: countWords(originalText),
+    model_preset: input.modelPreset ?? null,
+    input_summary: originalText.slice(0, 160),
+  });
 
   if (!originalText) {
     const emptyOutput: ToneOutputArtifact = {
@@ -500,12 +551,24 @@ export async function runTonePipelineWithArtifact(
       validation_score: 100,
     };
 
+    logger.warn("capability_complete", {
+      capability: "tone",
+      duration_ms: Date.now() - startMs,
+      word_count: countWords(emptyOutput.final_content),
+      assumptions_count: emptyOutput.assumptions.length,
+      total_tokens: 0,
+      total_cost: 0,
+      pass: true,
+      outcome: "degraded",
+    });
+
     return createCapabilityOutput({
       capability: "tone",
       inputSummary: "Received empty input for tone rewrite.",
       artifact: emptyOutput,
       rendered: emptyOutput.final_content,
       assumptions: emptyOutput.assumptions,
+      metrics: { total_tokens: 0, total_cost: 0 },
     });
   }
 
@@ -541,6 +604,12 @@ export async function runTonePipelineWithArtifact(
     if (loaded.profile) {
       brandProfile = loaded.profile;
     } else {
+      logger.warn("override_fallback", {
+        capability: "tone",
+        step: "normalize",
+        requested_voice: "brand",
+        fallback_voice: "persuasive",
+      });
       voice = "persuasive";
     }
   }
@@ -590,19 +659,40 @@ export async function runTonePipelineWithArtifact(
     : `Voice profile missing for ${voice}. Preserve facts. Produce usable output.`;
 
   const firstPassInstructions = input.fixInstructions?.length ? input.fixInstructions : undefined;
-  const firstPass = await runWriter(client, inputArtifact, voiceProfile, firstPassInstructions);
+  const firstPass = await runWriter(client, inputArtifact, voiceProfile, firstPassInstructions, logger, usage);
   let rewrittenContent = firstPass.rewrittenContent || originalText;
   assumptions.push(...firstPass.assumptions);
 
-  let validator = await runValidator(client, originalText, rewrittenContent, voice, format);
+  logger.info("rewrite_complete", {
+    capability: "tone",
+    voice_applied: voice,
+    word_count: countWords(rewrittenContent),
+  });
+
+  let retryCount = 0;
+  let validator = await runValidator(client, originalText, rewrittenContent, voice, format, logger, usage);
 
   if (!validator.pass && validator.correction_instructions.length > 0) {
+    retryCount = 1;
     assumptions.push("Validator requested one targeted correction pass.");
-    const fixPass = await runWriter(client, inputArtifact, voiceProfile, validator.correction_instructions);
+    const fixPass = await runWriter(client, inputArtifact, voiceProfile, validator.correction_instructions, logger, usage);
     rewrittenContent = fixPass.rewrittenContent || rewrittenContent;
     assumptions.push(...fixPass.assumptions);
-    validator = await runValidator(client, originalText, rewrittenContent, voice, format);
+    logger.info("rewrite_complete", {
+      capability: "tone",
+      voice_applied: voice,
+      word_count: countWords(rewrittenContent),
+      retry_count: retryCount,
+    });
+    validator = await runValidator(client, originalText, rewrittenContent, voice, format, logger, usage);
   }
+
+  logger.info("validation_complete", {
+    capability: "tone",
+    pass: validator.pass,
+    retry_count: retryCount,
+    validation_score: validator.validation_score,
+  });
 
   const outputArtifact = makeToneOutputArtifact(rewrittenContent, voice, format, assumptions, validator, originalText);
   const outputValidation = validate("ToneOutputArtifact", outputArtifact);
@@ -613,16 +703,28 @@ export async function runTonePipelineWithArtifact(
     ];
   }
 
+  logger.info("capability_complete", {
+    capability: "tone",
+    duration_ms: Date.now() - startMs,
+    word_count: countWords(outputArtifact.final_content),
+    assumptions_count: outputArtifact.assumptions.length,
+    total_tokens: usage.total_tokens,
+    total_cost: usage.total_cost,
+    pass: validator.pass,
+    outcome: validator.pass ? "success" : "degraded",
+  });
+
   return createCapabilityOutput({
     capability: "tone",
     inputSummary: buildInputSummary(inputArtifact),
     artifact: outputArtifact,
     rendered: outputArtifact.final_content,
     assumptions: outputArtifact.assumptions,
+    metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
   });
 }
 
-export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClient): Promise<string> {
-  const output = await runTonePipelineWithArtifact(input, client);
+export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClient, logger?: AgentLogger): Promise<string> {
+  const output = await runTonePipelineWithArtifact(input, client, logger);
   return output.rendered;
 }

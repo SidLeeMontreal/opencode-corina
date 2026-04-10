@@ -4,8 +4,17 @@ import { fileURLToPath } from "node:url";
 
 import type { Layer1Scan } from "opencode-text-tools";
 
+import {
+  addLlmMetrics,
+  errorDetails,
+  extractLlmMetrics,
+  makeConsoleLogger,
+  type AgentLogger,
+  type UsageAccumulator,
+} from "./logger.js";
 import { loadPrompt } from "./prompt-loader.js";
 import type { Layer2Analysis, OpenCodeClient, PatternFinding } from "./types.js";
+
 const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas");
 const FALLBACK_PROMPT = `You are an independent AI-writing pattern analyst. Your role is forensic and diagnostic — you do not rewrite, you do not judge quality, and you do not claim authorship with certainty.
 
@@ -116,17 +125,26 @@ export async function runLayer2Analysis(
   layer1Scan: Layer1Scan,
   client: OpenCodeClient,
   modelPreset?: string,
+  logger: AgentLogger = makeConsoleLogger("corina"),
+  usage?: UsageAccumulator,
 ): Promise<Layer2Analysis> {
   const sessionResponse = await client.session.create({ body: { title: "Corina detect layer 2" } });
   const session = unwrapData<{ id: string }>(sessionResponse);
 
+  logger.debug("session_created", { capability: "detect", step: "layer2", session_id: session.id, agent: "corina-detector" });
+
   try {
-    await promptSession(client, session.id, {
+    const primerStartMs = Date.now();
+    const primerResult = await promptSession(client, session.id, {
       agent: "corina-detector",
       noReply: true,
       parts: [{ type: "text", text: loadDetectorPrompt() }],
     });
+    const primerMetrics = extractLlmMetrics(primerResult, "layer2_setup", primerStartMs);
+    addLlmMetrics(usage, primerMetrics);
+    logger.info("llm_call", { capability: "detect", ...primerMetrics });
 
+    const resultStartMs = Date.now();
     const result = await promptSession(client, session.id, {
       agent: "corina-detector",
       parts: [
@@ -152,11 +170,16 @@ export async function runLayer2Analysis(
         retryCount: 2,
       },
     });
+    const resultMetrics = extractLlmMetrics(result, "layer2", resultStartMs);
+    addLlmMetrics(usage, resultMetrics);
+    logger.info("llm_call", { capability: "detect", ...resultMetrics });
 
     return parseStructuredOutput<Layer2Analysis>(result);
   } catch (error) {
+    logger.warn("step_error", { capability: "detect", step: "layer2", degraded: true, ...errorDetails(error) });
     return fallbackLayer2(layer1Scan, [], error);
   } finally {
     await deleteSession(client, session.id);
+    logger.debug("session_deleted", { capability: "detect", step: "layer2", session_id: session.id });
   }
 }

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { AI_PATTERN_MAP, detectAiPatterns, type Layer1Scan, type PatternMatch } from "opencode-text-tools";
 
 import { createCapabilityOutput } from "./capability-output.js";
+import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { formatInline, formatJson, formatReport } from "./detect-formatters.js";
 import { runLayer2Analysis } from "./detect-layer2.js";
 import {
@@ -264,29 +265,55 @@ export interface DetectInput {
 export async function runDetectWithArtifact(
   input: DetectInput,
   client: OpenCodeClient,
+  logger: AgentLogger = makeConsoleLogger("corina"),
 ): Promise<AgentCapabilityOutput<DetectionReport>> {
+  const startMs = Date.now();
+  const usage = createUsageAccumulator();
   const resolved = resolveInput(input.text);
   const text = cleanText(resolved.text);
 
+  logger.info("capability_start", {
+    capability: "detect",
+    input_word_count: countWords(text),
+    model_preset: input.modelPreset ?? null,
+    input_summary: text.slice(0, 160),
+  });
+
   if (!text) {
     const report = emptyReport(resolved);
+    logger.warn("capability_complete", {
+      capability: "detect",
+      duration_ms: Date.now() - startMs,
+      word_count: 0,
+      assumptions_count: report.assumptions.length,
+      total_tokens: 0,
+      total_cost: 0,
+      pass: true,
+      outcome: "degraded",
+    });
     return createCapabilityOutput({
       capability: "detect",
       inputSummary: buildInputSummary(resolved, report),
       artifact: report,
       rendered: formatOutput("", report, input.format),
       assumptions: report.assumptions,
+      metrics: { total_tokens: 0, total_cost: 0 },
     });
   }
 
+  const layer1StartMs = Date.now();
   const layer1Scan = detectAiPatterns(text);
   const occurrenceMap = buildOccurrenceMap(text, layer1Scan.patternMatches.map((match) => match.matchedText));
   const layer1Findings = layer1Scan.patternMatches.map((match) => buildFinding(text, match, layer1Scan, occurrenceMap));
-  const layer2 = await runLayer2Analysis(text, layer1Scan, client, input.modelPreset);
+  logger.info("layer1_complete", { capability: "detect", pattern_count: layer1Findings.length, duration_ms: Date.now() - layer1StartMs });
+  const layer2StartMs = Date.now();
+  const layer2 = await runLayer2Analysis(text, layer1Scan, client, input.modelPreset, logger, usage);
   const findings = mergeLayer2Findings(text, layer1Findings, layer2);
   const baseScore = scoreFindings(findings);
   const overallScore = applyLayer2Adjustment(baseScore, layer2.score_adjustment);
   const verdict = verdictFromScore(overallScore);
+
+  logger.info("layer2_complete", { capability: "detect", verdict: verdictFromScore(applyLayer2Adjustment(scoreFindings(layer1Findings), layer2.score_adjustment)), score: applyLayer2Adjustment(scoreFindings(layer1Findings), layer2.score_adjustment), duration_ms: Date.now() - layer2StartMs, ran: layer2.ran });
 
   const report: DetectionReport = {
     overall_score: overallScore,
@@ -329,6 +356,7 @@ export async function runDetectWithArtifact(
   const assumptions = [...report.assumptions];
 
   if (input.autoFix) {
+    logger.info("chain_start", { capability: "detect", chain_target: "tone" });
     const fixed = await runTonePipelineWithArtifact(
       {
         text,
@@ -337,23 +365,40 @@ export async function runDetectWithArtifact(
         fixInstructions: autoFixInstructions(report),
       },
       client,
+      logger,
     );
     rendered = `${rendered}\n\nAuto-fix\n--------\n${fixed.artifact.final_content}`;
     chainedTo = "tone";
     chainResult = fixed.artifact;
     assumptions.push("Auto-fix rewrite appended using Corina tone capability.");
+    logger.info("chain_complete", { capability: "detect", chain_target: "tone", outcome: "success" });
   }
 
   if (input.chain === "pipeline") {
+    logger.info("chain_start", { capability: "detect", chain_target: "pipeline" });
     const fixed = await runPipelineWithArtifact(
       `Rewrite this text to remove AI writing patterns:\n\n${text}`,
       client,
+      undefined,
+      logger,
     );
     rendered = `${rendered}\n\nChain result (pipeline)\n-----------------------\n${fixed.rendered}`;
     chainedTo = "pipeline";
     chainResult = fixed.artifact;
     assumptions.push("Pipeline rewrite appended because detect was chained to pipeline.");
+    logger.info("chain_complete", { capability: "detect", chain_target: "pipeline", outcome: "success" });
   }
+
+  logger.info("capability_complete", {
+    capability: "detect",
+    duration_ms: Date.now() - startMs,
+    word_count: report.input.word_count,
+    assumptions_count: assumptions.length,
+    total_tokens: usage.total_tokens,
+    total_cost: usage.total_cost,
+    pass: report.verdict !== "likely_ai",
+    outcome: chainResult ? "degraded" : "success",
+  });
 
   return {
     ...createCapabilityOutput({
@@ -363,13 +408,14 @@ export async function runDetectWithArtifact(
       rendered,
       chainedTo,
       assumptions,
+      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
     }),
     ...(chainResult ? { chain_result: chainResult } : {}),
   };
 }
 
-export async function runDetect(input: DetectInput, client: OpenCodeClient): Promise<string> {
-  const output = await runDetectWithArtifact(input, client);
+export async function runDetect(input: DetectInput, client: OpenCodeClient, logger?: AgentLogger): Promise<string> {
+  const output = await runDetectWithArtifact(input, client, logger);
   return output.rendered;
 }
 

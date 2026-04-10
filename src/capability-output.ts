@@ -22,8 +22,9 @@ export function createCapabilityOutput<T>(options: {
   rendered: string;
   chainedTo?: string;
   assumptions?: string[];
+  metrics?: { total_tokens?: number; total_cost?: number };
 }): AgentCapabilityOutput<T> {
-  const { capability, mode, inputSummary, artifact, rendered, chainedTo, assumptions } = options;
+  const { capability, mode, inputSummary, artifact, rendered, chainedTo, assumptions, metrics } = options;
 
   return {
     agent: "corina",
@@ -36,5 +37,6 @@ export function createCapabilityOutput<T>(options: {
     rendered,
     ...(chainedTo ? { chained_to: chainedTo } : {}),
     ...(assumptions?.length ? { assumptions } : {}),
+    ...(metrics ? { metrics } : {}),
   };
 }

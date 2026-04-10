@@ -7,6 +7,15 @@ import type { ResolvedModel } from "opencode-model-resolver";
 import { detectAiPatterns } from "opencode-text-tools";
 
 import { createCapabilityOutput } from "./capability-output.js";
+import {
+  addLlmMetrics,
+  createUsageAccumulator,
+  errorDetails,
+  extractLlmMetrics,
+  makeConsoleLogger,
+  type AgentLogger,
+  type UsageAccumulator,
+} from "./logger.js";
 import { loadPrompt } from "./prompt-loader.js";
 import { aggregateComparison } from "./critique-compare.js";
 import {
@@ -140,17 +149,23 @@ async function deleteSession(client: OpenCodeClient, sessionId: string) {
 async function runStructuredSession<T>(input: {
   client: OpenCodeClient;
   title: string;
+  step: string;
   agent: string;
   personaFile: string;
   schemaFile: string;
   taskPrompt: string;
   model?: ResolvedModel;
+  logger: AgentLogger;
+  usage: UsageAccumulator;
 }): Promise<T> {
   const sessionResponse = await input.client.session.create({ body: { title: input.title } });
   const session = unwrapData<{ id: string }>(sessionResponse);
 
+  input.logger.debug("session_created", { capability: "critique", step: input.step, session_id: session.id, agent: input.agent, model_id: input.model?.modelID, provider_id: input.model?.providerID });
+
   try {
-    await promptSession(
+    const primerStartMs = Date.now();
+    const primerResult = await promptSession(
       input.client,
       session.id,
       {
@@ -160,7 +175,11 @@ async function runStructuredSession<T>(input: {
       },
       input.model,
     );
+    const primerMetrics = extractLlmMetrics(primerResult, `${input.step}_setup`, primerStartMs);
+    addLlmMetrics(input.usage, primerMetrics);
+    input.logger.info("llm_call", { capability: "critique", ...primerMetrics });
 
+    const resultStartMs = Date.now();
     const result = await promptSession(
       input.client,
       session.id,
@@ -175,10 +194,17 @@ async function runStructuredSession<T>(input: {
       },
       input.model,
     );
+    const resultMetrics = extractLlmMetrics(result, input.step, resultStartMs);
+    addLlmMetrics(input.usage, resultMetrics);
+    input.logger.info("llm_call", { capability: "critique", ...resultMetrics });
 
     return parseStructuredOutput<T>(result);
+  } catch (error) {
+    input.logger.error("step_error", { capability: "critique", step: input.step, session_id: session.id, degraded: false, ...errorDetails(error) });
+    throw error;
   } finally {
     await deleteSession(input.client, session.id);
+    input.logger.debug("session_deleted", { capability: "critique", step: input.step, session_id: session.id });
   }
 }
 
@@ -600,6 +626,7 @@ export async function executeChain(
   critiqueOutput: AgentCapabilityOutput<CritiqueArtifactUnion>,
   client: OpenCodeClient,
   options: RunCritiqueOptions,
+  logger: AgentLogger,
 ): Promise<{ chainResult: AgentCapabilityOutput<unknown>; appendedRendered: string }> {
   const text = getCritiquedText(critiqueOutput, options);
   if (!text) {
@@ -607,6 +634,8 @@ export async function executeChain(
   }
 
   let chainResult: AgentCapabilityOutput<unknown>;
+
+  logger.info("chain_start", { capability: "critique", chain_target: chain, mode: critiqueOutput.mode });
 
   if (chain === "tone") {
     const toneInput = buildToneChainInput(critiqueOutput, options);
@@ -619,11 +648,12 @@ export async function executeChain(
         preservationInstructions: toneInput.preservationInstructions,
       },
       client,
+      logger,
     );
   } else if (chain === "detect") {
-    chainResult = await runDetectWithArtifact({ text, format: "report", modelPreset: options.modelPreset }, client);
+    chainResult = await runDetectWithArtifact({ text, format: "report", modelPreset: options.modelPreset }, client, logger);
   } else if (critiqueOutput.mode === "quality") {
-    chainResult = await runPipelineWithArtifact(buildBriefFromCritique(text, critiqueOutput.artifact as CritiqueReport), client);
+    chainResult = await runPipelineWithArtifact(buildBriefFromCritique(text, critiqueOutput.artifact as CritiqueReport), client, undefined, logger);
   } else {
     const guidance = critiqueOutput.mode === "audience"
       ? (critiqueOutput.artifact as AudienceCritiqueReport).rewrite_brief
@@ -641,8 +671,12 @@ export async function executeChain(
         ...guidance.map((item, index) => `${index + 1}. ${item}`),
       ].join("\n"),
       client,
+      undefined,
+      logger,
     );
   }
+
+  logger.info("chain_complete", { capability: "critique", chain_target: chain, outcome: "success", mode: critiqueOutput.mode });
 
   return {
     chainResult,
@@ -654,6 +688,9 @@ async function finalizeOutput(
   output: AgentCapabilityOutput<CritiqueArtifactUnion>,
   options: RunCritiqueOptions,
   client: OpenCodeClient,
+  logger: AgentLogger,
+  usage: UsageAccumulator,
+  startMs: number,
 ): Promise<AgentCapabilityOutput<CritiqueArtifactUnion>> {
   let finalized = {
     ...output,
@@ -661,10 +698,12 @@ async function finalizeOutput(
   };
 
   if (!options.chain) {
+    logger.info("critique_complete", { capability: "critique", mode: finalized.mode, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost });
+    logger.info("capability_complete", { capability: "critique", mode: finalized.mode, duration_ms: Date.now() - startMs, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: "success" });
     return finalized;
   }
 
-  const { chainResult, appendedRendered } = await executeChain(options.chain, finalized, client, options);
+  const { chainResult, appendedRendered } = await executeChain(options.chain, finalized, client, options, logger);
   finalized = {
     ...finalized,
     rendered: `${finalized.rendered}\n\n${appendedRendered}`,
@@ -672,18 +711,24 @@ async function finalizeOutput(
     chain_result: chainResult.artifact,
   };
 
+  logger.info("critique_complete", { capability: "critique", mode: finalized.mode, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost });
+  logger.info("capability_complete", { capability: "critique", mode: finalized.mode, duration_ms: Date.now() - startMs, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: "success", chain_target: options.chain });
+
   return finalized;
 }
 
-async function runQualityMode(text: string, sourcePath: string | null, toneOutput: ToneOutputArtifact | undefined, detectionReport: DetectionReport | undefined, assumptions: string[], client: OpenCodeClient, model?: ResolvedModel): Promise<CritiqueReport> {
+async function runQualityMode(text: string, sourcePath: string | null, toneOutput: ToneOutputArtifact | undefined, detectionReport: DetectionReport | undefined, assumptions: string[], client: OpenCodeClient, model: ResolvedModel | undefined, logger: AgentLogger, usage: UsageAccumulator): Promise<CritiqueReport> {
   const report = await runStructuredSession<CritiqueReport>({
     client,
     title: "Corina critique",
+    step: "quality",
     agent: "corina-critic",
     personaFile: "tasks/critic.md",
     schemaFile: "CritiqueReport.json",
     taskPrompt: buildQualityPrompt({ text, sourcePath, toneOutput, detectionReport, assumptions }),
     model,
+    logger,
+    usage,
   });
 
   return enrichQualityReport(report, assumptions);
@@ -693,10 +738,15 @@ export async function runCritiqueWithArtifact(
   inputs: string[],
   options: RunCritiqueOptions,
   client: OpenCodeClient,
+  logger: AgentLogger = makeConsoleLogger("corina"),
 ): Promise<AgentCapabilityOutput<CritiqueArtifactUnion>> {
+  const startMs = Date.now();
+  const usage = createUsageAccumulator();
   const normalized = await normalizeCritiqueInputs(inputs, options);
   const assumptions = [...normalized.assumptions, ...normalized.warnings];
   const model = await resolveModel(options.modelPreset);
+
+  logger.info("capability_start", { capability: "critique", mode: normalized.mode, input_summary: inputs.join(" | ").slice(0, 160), model_preset: options.modelPreset ?? null, input_count: inputs.length });
 
   if (!normalized.items.length) {
     const mode = normalized.mode;
@@ -713,17 +763,20 @@ export async function runCritiqueWithArtifact(
       rendered: "",
       assumptions,
     });
-    return {
+    const finalized = {
       ...provisional,
       rendered: renderOutput(provisional as AgentCapabilityOutput<CritiqueArtifactUnion>, options.format),
     };
+    logger.warn("critique_complete", { capability: "critique", mode, assumptions_count: assumptions.length, total_tokens: usage.total_tokens, total_cost: usage.total_cost });
+    logger.warn("capability_complete", { capability: "critique", mode, duration_ms: Date.now() - startMs, assumptions_count: assumptions.length, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: "degraded" });
+    return finalized;
   }
 
   if (normalized.mode === "quality") {
     const item = normalized.items[0];
     let artifact: CritiqueReport;
     try {
-      artifact = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model);
+      artifact = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model, logger, usage);
     } catch (error) {
       artifact = buildFallbackQualityReport(item.text, assumptions, error);
     }
@@ -738,9 +791,13 @@ export async function runCritiqueWithArtifact(
         artifact,
         rendered: "",
         assumptions: artifact.assumptions,
+        metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
       }),
       { ...options, __chainSourceText: item.text },
       client,
+      logger,
+      usage,
+      startMs,
     );
   }
 
@@ -751,6 +808,7 @@ export async function runCritiqueWithArtifact(
       artifact = await runStructuredSession<AudienceCritiqueReport>({
         client,
         title: "Corina audience critique",
+        step: "audience",
         agent: "corina-audience-critic",
         personaFile: "tasks/audience-critic.md",
         schemaFile: "AudienceCritiqueReport.json",
@@ -764,6 +822,8 @@ export async function runCritiqueWithArtifact(
           assumptions,
         }),
         model,
+        logger,
+        usage,
       });
       artifact.assumptions = [...(artifact.assumptions ?? []), ...assumptions];
     } catch (error) {
@@ -784,9 +844,13 @@ export async function runCritiqueWithArtifact(
         artifact,
         rendered: "",
         assumptions: artifact.assumptions,
+        metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
       }),
       { ...options, __chainSourceText: item.text },
       client,
+      logger,
+      usage,
+      startMs,
     );
   }
 
@@ -797,6 +861,7 @@ export async function runCritiqueWithArtifact(
       artifact = await runStructuredSession<RubricReport>({
         client,
         title: "Corina rubric critique",
+        step: "rubric",
         agent: "corina-rubric-critic",
         personaFile: "tasks/rubric-critic.md",
         schemaFile: "RubricReport.json",
@@ -809,6 +874,8 @@ export async function runCritiqueWithArtifact(
           assumptions,
         }),
         model,
+        logger,
+        usage,
       });
       artifact.assumptions = [...(artifact.assumptions ?? []), ...assumptions];
     } catch (error) {
@@ -825,9 +892,13 @@ export async function runCritiqueWithArtifact(
         artifact,
         rendered: "",
         assumptions: artifact.assumptions,
+        metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
       }),
       { ...options, __chainSourceText: item.text },
       client,
+      logger,
+      usage,
+      startMs,
     );
   }
 
@@ -842,7 +913,7 @@ export async function runCritiqueWithArtifact(
 
   for (const item of normalized.items) {
     try {
-      const report = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model);
+      const report = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model, logger, usage);
       reports.push({ label: item.label, score: report.overall_score, report, itemId: item.id, text: item.text });
     } catch (error) {
       const report = buildFallbackQualityReport(item.text, assumptions, error);
@@ -869,10 +940,13 @@ export async function runCritiqueWithArtifact(
     }),
     options,
     client,
+    logger,
+    usage,
+    startMs,
   );
 }
 
-export async function runCritique(inputs: string[], options: RunCritiqueOptions, client: OpenCodeClient): Promise<string> {
-  const output = await runCritiqueWithArtifact(inputs, options, client);
+export async function runCritique(inputs: string[], options: RunCritiqueOptions, client: OpenCodeClient, logger?: AgentLogger): Promise<string> {
+  const output = await runCritiqueWithArtifact(inputs, options, client, logger);
   return options.format === "json" ? formatJson(output) : output.rendered;
 }

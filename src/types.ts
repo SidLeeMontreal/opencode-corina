@@ -410,9 +410,15 @@ export interface StepResult<T> {
 
 export interface AuditLogEntry {
   timestamp: string;
-  event: string;
-  sessionId?: string;
-  briefPreview?: string;
-  outcome?: string;
-  metadata?: Record<string, unknown>;
+  event: "capability_complete" | "session_idle" | "chain_complete";
+  capability: string;
+  mode?: string;
+  session_id?: string;
+  input_summary?: string;
+  outcome: "success" | "degraded" | "failed";
+  duration_ms?: number;
+  total_tokens?: number;
+  total_cost?: number;
+  chain_target?: string;
+  assumptions_count?: number;
 }
