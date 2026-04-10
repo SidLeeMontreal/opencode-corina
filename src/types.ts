@@ -175,6 +175,7 @@ export interface ToneRawInput {
   profile?: string;
   modelPreset?: string;
   fixInstructions?: string[];
+  preservationInstructions?: string[];
 }
 
 export interface PatternFinding {
@@ -255,6 +256,7 @@ export interface DetectionRawInput {
   text: string;
   format?: DetectionFormat;
   autoFix?: boolean;
+  chain?: "pipeline";
   voice?: string;
   modelPreset?: string;
 }

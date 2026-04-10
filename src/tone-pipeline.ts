@@ -571,7 +571,10 @@ export async function runTonePipelineWithArtifact(
     brand_profile: brandProfile,
     tone_description: toneDescription,
     personal_tone_profile: personalToneProfile,
-    preservation_instructions: ["Preserve facts, named entities, dates, numbers, and core claims."],
+    preservation_instructions: [
+      "Preserve facts, named entities, dates, numbers, and core claims.",
+      ...(input.preservationInstructions ?? []),
+    ],
     detected_source_format: inferFormat(originalText),
     source_metrics: {
       character_count: originalText.length,

@@ -17,13 +17,15 @@ import {
   formatRubricInline,
 } from "./critique-formatters.js";
 import { normalizeCritiqueInputs } from "./critique-normalizer.js";
+import { runDetectWithArtifact } from "./detect.js";
+import { runPipelineWithArtifact } from "./pipeline.js";
+import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
 import type {
   AgentCapabilityOutput,
   AudienceCritiqueReport,
   ComparisonReport,
   CritiqueArtifactUnion,
   CritiqueChain,
-  CritiqueIssue,
   CritiqueMode,
   CritiqueRenderFormat,
   CritiqueReport,
@@ -32,6 +34,7 @@ import type {
   ResolvedRubric,
   RubricReport,
   ToneOutputArtifact,
+  ToneVoice,
 } from "./types.js";
 import { validate } from "./validators.js";
 
@@ -40,6 +43,19 @@ const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas
 const promptCache = new Map<string, string>();
 const schemaCache = new Map<string, Record<string, unknown>>();
 const modelResolver = new ModelResolver();
+const TONE_VOICES = new Set<ToneVoice>([
+  "journalist",
+  "technical",
+  "persuasive",
+  "social",
+  "ux",
+  "seo",
+  "accessibility",
+  "executive",
+  "brand",
+  "email",
+  "personal",
+]);
 
 export interface RunCritiqueOptions {
   mode?: CritiqueMode;
@@ -48,6 +64,8 @@ export interface RunCritiqueOptions {
   chain?: CritiqueChain;
   format?: CritiqueRenderFormat;
   modelPreset?: string;
+  voice?: string;
+  __chainSourceText?: string;
 }
 
 function loadPrompt(filename: string): string {
@@ -358,13 +376,196 @@ function renderOutput(output: AgentCapabilityOutput<CritiqueArtifactUnion>, form
   return formatComparisonInline(output.artifact as ComparisonReport);
 }
 
-function applyChain(rendered: string, chain: CritiqueChain | undefined): { rendered: string; chainedTo?: string; extraAssumption?: string } {
-  if (!chain) return { rendered };
+function isToneVoice(value: string | undefined | null): value is ToneVoice {
+  return Boolean(value && TONE_VOICES.has(value as ToneVoice));
+}
+
+export function inferVoiceFromAudience(audience: string | undefined | null): ToneVoice {
+  const normalized = audience?.trim().toLowerCase() ?? "";
+  if (/(cmo|vp marketing|chief marketing officer|executive|leadership|board)/.test(normalized)) return "executive";
+  if (/(developer|engineer|technical|architect|api|platform)/.test(normalized)) return "technical";
+  return "persuasive";
+}
+
+function collectQualityFixes(report: CritiqueReport): string[] {
+  const issueDirections = report.issues.map((issue) => `${issue.dimension}: ${issue.fix_direction}`);
+  return [...report.revision_instructions, ...issueDirections, ...report.fatal_issues];
+}
+
+function collectRubricFixes(report: RubricReport): string[] {
+  return report.dimensions.flatMap((dimension) => [
+    ...dimension.weaknesses,
+    ...dimension.fix_directions.map((direction) => `${dimension.label}: ${direction}`),
+  ]);
+}
+
+function getCritiquedText(output: AgentCapabilityOutput<CritiqueArtifactUnion>, options: RunCritiqueOptions): string {
+  if (output.mode === "compare") {
+    return (output.artifact as ComparisonReport).winner_text?.trim() ?? "";
+  }
+
+  return options.__chainSourceText?.trim() ?? "";
+}
+
+function getRequestedVoice(options: RunCritiqueOptions): ToneVoice | undefined {
+  return isToneVoice(options.voice) ? options.voice : undefined;
+}
+
+function buildToneChainInput(
+  critiqueOutput: AgentCapabilityOutput<CritiqueArtifactUnion>,
+  options: RunCritiqueOptions,
+): {
+  text: string;
+  voice: ToneVoice;
+  fixInstructions?: string[];
+  preservationInstructions?: string[];
+} {
+  const requestedVoice = getRequestedVoice(options);
+
+  if (critiqueOutput.mode === "quality") {
+    const artifact = critiqueOutput.artifact as CritiqueReport;
+    return {
+      text: getCritiquedText(critiqueOutput, options),
+      voice: requestedVoice ?? "persuasive",
+      fixInstructions: collectQualityFixes(artifact),
+      preservationInstructions: artifact.revision_instructions,
+    };
+  }
+
+  if (critiqueOutput.mode === "audience") {
+    const artifact = critiqueOutput.artifact as AudienceCritiqueReport;
+    const fixInstructions = [...artifact.rewrite_brief, ...artifact.what_misses, ...artifact.missing_for_audience];
+    return {
+      text: getCritiquedText(critiqueOutput, options),
+      voice: requestedVoice ?? inferVoiceFromAudience(artifact.audience_applied || options.audience),
+      fixInstructions,
+    };
+  }
+
+  if (critiqueOutput.mode === "rubric") {
+    const artifact = critiqueOutput.artifact as RubricReport;
+    return {
+      text: getCritiquedText(critiqueOutput, options),
+      voice: requestedVoice ?? (isToneVoice(artifact.rubric_id) ? artifact.rubric_id : "persuasive"),
+      fixInstructions: collectRubricFixes(artifact),
+    };
+  }
+
   return {
-    rendered: `${rendered}\n\nChain requested: ${chain} (not yet executed by /corina-critique).`,
-    chainedTo: chain,
-    extraAssumption: `Chain target '${chain}' was recorded but not executed by this capability yet.`,
+    text: getCritiquedText(critiqueOutput, options),
+    voice: requestedVoice ?? "persuasive",
   };
+}
+
+export function buildBriefFromCritique(text: string, report: CritiqueReport): string {
+  const issues = report.issues.length
+    ? report.issues.map((issue, index) => `${index + 1}. [${issue.dimension}] ${issue.summary} — ${issue.fix_direction}`).join("\n")
+    : "1. Resolve the critique's flagged issues while preserving meaning.";
+
+  const revisionInstructions = report.revision_instructions.length
+    ? report.revision_instructions.map((instruction, index) => `${index + 1}. ${instruction}`).join("\n")
+    : "1. Revise the draft so it passes critique.";
+
+  const fatalIssues = report.fatal_issues.length
+    ? report.fatal_issues.map((issue, index) => `${index + 1}. ${issue}`).join("\n")
+    : "None.";
+
+  return [
+    "Revise the following draft so it addresses the critique findings and comes back publishable.",
+    "Preserve the underlying facts, named entities, numbers, and intent unless the critique explicitly requires a change.",
+    "",
+    "ORIGINAL TEXT:",
+    text,
+    "",
+    "CRITIQUE ISSUES TO ADDRESS:",
+    issues,
+    "",
+    "REVISION INSTRUCTIONS:",
+    revisionInstructions,
+    "",
+    "FATAL ISSUES:",
+    fatalIssues,
+  ].join("\n");
+}
+
+export async function executeChain(
+  chain: CritiqueChain,
+  critiqueOutput: AgentCapabilityOutput<CritiqueArtifactUnion>,
+  client: OpenCodeClient,
+  options: RunCritiqueOptions,
+): Promise<{ chainResult: AgentCapabilityOutput<unknown>; appendedRendered: string }> {
+  const text = getCritiquedText(critiqueOutput, options);
+  if (!text) {
+    throw new Error(`Chain target '${chain}' could not find source text to execute.`);
+  }
+
+  let chainResult: AgentCapabilityOutput<unknown>;
+
+  if (chain === "tone") {
+    const toneInput = buildToneChainInput(critiqueOutput, options);
+    chainResult = await runTonePipelineWithArtifact(
+      {
+        text: toneInput.text,
+        voice: toneInput.voice,
+        modelPreset: options.modelPreset,
+        fixInstructions: toneInput.fixInstructions,
+        preservationInstructions: toneInput.preservationInstructions,
+      },
+      client,
+    );
+  } else if (chain === "detect") {
+    chainResult = await runDetectWithArtifact({ text, format: "report", modelPreset: options.modelPreset }, client);
+  } else if (critiqueOutput.mode === "quality") {
+    chainResult = await runPipelineWithArtifact(buildBriefFromCritique(text, critiqueOutput.artifact as CritiqueReport), client);
+  } else {
+    const guidance = critiqueOutput.mode === "audience"
+      ? (critiqueOutput.artifact as AudienceCritiqueReport).rewrite_brief
+      : critiqueOutput.mode === "rubric"
+        ? collectRubricFixes(critiqueOutput.artifact as RubricReport)
+        : [(critiqueOutput.artifact as ComparisonReport).recommendation_reason];
+    chainResult = await runPipelineWithArtifact(
+      [
+        "Revise the following text so it resolves the supplied critique guidance.",
+        "",
+        "TEXT:",
+        text,
+        "",
+        "GUIDANCE:",
+        ...guidance.map((item, index) => `${index + 1}. ${item}`),
+      ].join("\n"),
+      client,
+    );
+  }
+
+  return {
+    chainResult,
+    appendedRendered: `Chain result (${chain})\n-------------------\n${chainResult.rendered}`,
+  };
+}
+
+async function finalizeOutput(
+  output: AgentCapabilityOutput<CritiqueArtifactUnion>,
+  options: RunCritiqueOptions,
+  client: OpenCodeClient,
+): Promise<AgentCapabilityOutput<CritiqueArtifactUnion>> {
+  let finalized = {
+    ...output,
+    rendered: renderOutput(output, options.format),
+  };
+
+  if (!options.chain) {
+    return finalized;
+  }
+
+  const { chainResult, appendedRendered } = await executeChain(options.chain, finalized, client, options);
+  finalized = {
+    ...finalized,
+    rendered: `${finalized.rendered}\n\n${appendedRendered}`,
+    chained_to: options.chain,
+    chain_result: chainResult.artifact,
+  };
+
+  return finalized;
 }
 
 async function runQualityMode(text: string, sourcePath: string | null, toneOutput: ToneOutputArtifact | undefined, detectionReport: DetectionReport | undefined, assumptions: string[], client: OpenCodeClient, model?: ResolvedModel): Promise<CritiqueReport> {
@@ -405,19 +606,16 @@ export async function runCritiqueWithArtifact(
       rendered: "",
       assumptions,
     });
-    const chainInfo = applyChain(renderOutput(provisional as AgentCapabilityOutput<CritiqueArtifactUnion>, options.format), options.chain);
     return {
       ...provisional,
-      rendered: chainInfo.rendered,
-      ...(chainInfo.chainedTo ? { chained_to: chainInfo.chainedTo } : {}),
-      assumptions: chainInfo.extraAssumption ? [...assumptions, chainInfo.extraAssumption] : assumptions,
+      rendered: renderOutput(provisional as AgentCapabilityOutput<CritiqueArtifactUnion>, options.format),
     };
   }
 
   if (normalized.mode === "quality") {
+    const item = normalized.items[0];
     let artifact: CritiqueReport;
     try {
-      const item = normalized.items[0];
       artifact = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model);
     } catch (error) {
       artifact = buildEmptyCritiqueReport(`Quality critique degraded: ${error instanceof Error ? error.message : String(error)}`, assumptions);
@@ -426,22 +624,18 @@ export async function runCritiqueWithArtifact(
 
     const validation = validate("CritiqueReport", artifact);
     if (!validation.valid) artifact.assumptions.push(`CritiqueReport validation warning: ${validation.errors.join("; ")}`);
-    const baseOutput = createCapabilityOutput({
-      capability: "critique",
-      mode: normalized.mode,
-      inputSummary: buildInputSummary(1, normalized.mode),
-      artifact,
-      rendered: "",
-      assumptions: artifact.assumptions,
-    });
-    const rendered = renderOutput(baseOutput, options.format);
-    const chainInfo = applyChain(rendered, options.chain);
-    return {
-      ...baseOutput,
-      rendered: chainInfo.rendered,
-      ...(chainInfo.chainedTo ? { chained_to: chainInfo.chainedTo } : {}),
-      assumptions: chainInfo.extraAssumption ? [...artifact.assumptions, chainInfo.extraAssumption] : artifact.assumptions,
-    };
+    return finalizeOutput(
+      createCapabilityOutput({
+        capability: "critique",
+        mode: normalized.mode,
+        inputSummary: buildInputSummary(1, normalized.mode),
+        artifact,
+        rendered: "",
+        assumptions: artifact.assumptions,
+      }),
+      { ...options, __chainSourceText: item.text },
+      client,
+    );
   }
 
   if (normalized.mode === "audience") {
@@ -476,22 +670,18 @@ export async function runCritiqueWithArtifact(
 
     const validation = validate("AudienceCritiqueReport", artifact);
     if (!validation.valid) artifact.assumptions.push(`AudienceCritiqueReport validation warning: ${validation.errors.join("; ")}`);
-    const baseOutput = createCapabilityOutput({
-      capability: "critique",
-      mode: normalized.mode,
-      inputSummary: buildInputSummary(1, normalized.mode),
-      artifact,
-      rendered: "",
-      assumptions: artifact.assumptions,
-    });
-    const rendered = renderOutput(baseOutput, options.format);
-    const chainInfo = applyChain(rendered, options.chain);
-    return {
-      ...baseOutput,
-      rendered: chainInfo.rendered,
-      ...(chainInfo.chainedTo ? { chained_to: chainInfo.chainedTo } : {}),
-      assumptions: chainInfo.extraAssumption ? [...artifact.assumptions, chainInfo.extraAssumption] : artifact.assumptions,
-    };
+    return finalizeOutput(
+      createCapabilityOutput({
+        capability: "critique",
+        mode: normalized.mode,
+        inputSummary: buildInputSummary(1, normalized.mode),
+        artifact,
+        rendered: "",
+        assumptions: artifact.assumptions,
+      }),
+      { ...options, __chainSourceText: item.text },
+      client,
+    );
   }
 
   if (normalized.mode === "rubric") {
@@ -525,22 +715,18 @@ export async function runCritiqueWithArtifact(
 
     const validation = validate("RubricReport", artifact);
     if (!validation.valid) artifact.assumptions.push(`RubricReport validation warning: ${validation.errors.join("; ")}`);
-    const baseOutput = createCapabilityOutput({
-      capability: "critique",
-      mode: normalized.mode,
-      inputSummary: buildInputSummary(1, normalized.mode),
-      artifact,
-      rendered: "",
-      assumptions: artifact.assumptions,
-    });
-    const rendered = renderOutput(baseOutput, options.format);
-    const chainInfo = applyChain(rendered, options.chain);
-    return {
-      ...baseOutput,
-      rendered: chainInfo.rendered,
-      ...(chainInfo.chainedTo ? { chained_to: chainInfo.chainedTo } : {}),
-      assumptions: chainInfo.extraAssumption ? [...artifact.assumptions, chainInfo.extraAssumption] : artifact.assumptions,
-    };
+    return finalizeOutput(
+      createCapabilityOutput({
+        capability: "critique",
+        mode: normalized.mode,
+        inputSummary: buildInputSummary(1, normalized.mode),
+        artifact,
+        rendered: "",
+        assumptions: artifact.assumptions,
+      }),
+      { ...options, __chainSourceText: item.text },
+      client,
+    );
   }
 
   const reports: Array<{
@@ -568,22 +754,18 @@ export async function runCritiqueWithArtifact(
 
   const validation = validate("ComparisonReport", artifact);
   if (!validation.valid) artifact.assumptions.push(`ComparisonReport validation warning: ${validation.errors.join("; ")}`);
-  const baseOutput = createCapabilityOutput({
-    capability: "critique",
-    mode: normalized.mode,
-    inputSummary: buildInputSummary(normalized.items.length, normalized.mode),
-    artifact,
-    rendered: "",
-    assumptions: artifact.assumptions,
-  });
-  const rendered = renderOutput(baseOutput, options.format);
-  const chainInfo = applyChain(rendered, options.chain);
-  return {
-    ...baseOutput,
-    rendered: chainInfo.rendered,
-    ...(chainInfo.chainedTo ? { chained_to: chainInfo.chainedTo } : {}),
-    assumptions: chainInfo.extraAssumption ? [...artifact.assumptions, chainInfo.extraAssumption] : artifact.assumptions,
-  };
+  return finalizeOutput(
+    createCapabilityOutput({
+      capability: "critique",
+      mode: normalized.mode,
+      inputSummary: buildInputSummary(normalized.items.length, normalized.mode),
+      artifact,
+      rendered: "",
+      assumptions: artifact.assumptions,
+    }),
+    options,
+    client,
+  );
 }
 
 export async function runCritique(inputs: string[], options: RunCritiqueOptions, client: OpenCodeClient): Promise<string> {

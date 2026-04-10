@@ -98,11 +98,12 @@ export const CorinaPlugin: Plugin = async (input) => {
           text: tool.schema.string().describe("Text to analyze or a readable file path."),
           format: tool.schema.string().optional(),
           autoFix: tool.schema.boolean().optional(),
+          chain: tool.schema.string().optional(),
           voice: tool.schema.string().optional(),
           modelPreset: tool.schema.string().optional(),
         },
-        execute: async ({ text, format, autoFix, voice, modelPreset }, toolCtx) => {
-          const output = await runDetectWithArtifact({ text, format: format as any, autoFix, voice, modelPreset }, input.client);
+        execute: async ({ text, format, autoFix, chain, voice, modelPreset }, toolCtx) => {
+          const output = await runDetectWithArtifact({ text, format: format as any, autoFix, chain: chain as any, voice, modelPreset }, input.client);
           const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
           writeAuditLog({
             timestamp: new Date().toISOString(),
@@ -113,6 +114,7 @@ export const CorinaPlugin: Plugin = async (input) => {
             metadata: {
               format,
               autoFix,
+              chain,
               voice,
               modelPreset,
               outputLength: renderedOutput.length,
@@ -132,11 +134,12 @@ export const CorinaPlugin: Plugin = async (input) => {
           chain: tool.schema.string().optional(),
           format: tool.schema.string().optional(),
           modelPreset: tool.schema.string().optional(),
+          voice: tool.schema.string().optional(),
         },
-        async execute({ texts, mode, audience, rubric, chain, format, modelPreset }, toolCtx) {
+        async execute({ texts, mode, audience, rubric, chain, format, modelPreset, voice }, toolCtx) {
           const renderedOutput = await runCritique(
             texts,
-            { mode: mode as any, audience, rubric, chain: chain as any, format: format as any, modelPreset },
+            { mode: mode as any, audience, rubric, chain: chain as any, format: format as any, modelPreset, voice },
             input.client,
           );
           writeAuditLog({
@@ -153,6 +156,7 @@ export const CorinaPlugin: Plugin = async (input) => {
               chain,
               format,
               modelPreset,
+              voice,
               outputLength: renderedOutput.length,
             },
           });

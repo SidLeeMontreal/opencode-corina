@@ -15,6 +15,7 @@ import {
   summaryFromVerdict,
   verdictFromScore,
 } from "./detect-scoring.js";
+import { runPipelineWithArtifact } from "./pipeline.js";
 import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
 import type { AgentCapabilityOutput, DetectionReport, OpenCodeClient, PatternFinding } from "./types.js";
 import { validate } from "./validators.js";
@@ -255,6 +256,7 @@ export interface DetectInput {
   text: string;
   format?: "inline" | "report" | "json";
   autoFix?: boolean;
+  chain?: "pipeline";
   voice?: string;
   modelPreset?: string;
 }
@@ -323,6 +325,7 @@ export async function runDetectWithArtifact(
 
   let rendered = formatOutput(text, report, input.format);
   let chainedTo: string | undefined;
+  let chainResult: unknown;
   const assumptions = [...report.assumptions];
 
   if (input.autoFix) {
@@ -337,17 +340,32 @@ export async function runDetectWithArtifact(
     );
     rendered = `${rendered}\n\nAuto-fix\n--------\n${fixed.artifact.final_content}`;
     chainedTo = "tone";
+    chainResult = fixed.artifact;
     assumptions.push("Auto-fix rewrite appended using Corina tone capability.");
   }
 
-  return createCapabilityOutput({
-    capability: "detect",
-    inputSummary: buildInputSummary(resolved, report),
-    artifact: report,
-    rendered,
-    chainedTo,
-    assumptions,
-  });
+  if (input.chain === "pipeline") {
+    const fixed = await runPipelineWithArtifact(
+      `Rewrite this text to remove AI writing patterns:\n\n${text}`,
+      client,
+    );
+    rendered = `${rendered}\n\nChain result (pipeline)\n-----------------------\n${fixed.rendered}`;
+    chainedTo = "pipeline";
+    chainResult = fixed.artifact;
+    assumptions.push("Pipeline rewrite appended because detect was chained to pipeline.");
+  }
+
+  return {
+    ...createCapabilityOutput({
+      capability: "detect",
+      inputSummary: buildInputSummary(resolved, report),
+      artifact: report,
+      rendered,
+      chainedTo,
+      assumptions,
+    }),
+    ...(chainResult ? { chain_result: chainResult } : {}),
+  };
 }
 
 export async function runDetect(input: DetectInput, client: OpenCodeClient): Promise<string> {
