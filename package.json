@@ -1,7 +1,7 @@
 {
   "name": "opencode-corina",
   "version": "0.1.0",
-  "description": "Corina writing agent for OpenCode \u2014 gated 5-step editorial pipeline",
+  "description": "Corina writing agent for OpenCode — gated 5-step editorial pipeline",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,10 @@
     "test:regression": "vitest run tests/regression",
     "test:all": "vitest run",
     "eval": "node scripts/run-eval.mjs",
-    "coverage": "vitest run --coverage tests/unit"
+    "coverage": "vitest run --coverage tests/unit",
+    "eval:tier1": "node scripts/run-eval.mjs --mode auto --suite ./evals/suites/all.json",
+    "eval:tier2": "node scripts/run-eval.mjs --mode judge --suite ./evals/suites/all.json --format markdown",
+    "eval:baseline": "node scripts/run-eval.mjs --mode judge --suite ./evals/suites/all.json --save-baseline"
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.4.1",
@@ -27,7 +30,8 @@
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^4.1.4",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "opencode-eval-harness": "file:../opencode-eval-harness"
   },
   "keywords": [
     "opencode",

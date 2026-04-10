@@ -1,0 +1,11 @@
+{
+  "name": "corina-all",
+  "includes": [
+    "./corina-tone.json",
+    "./corina-detect.json",
+    "./corina-critique.json",
+    "./corina-pipeline.json"
+  ],
+  "tiers": [1, 2],
+  "judgeAgent": "corina-critic"
+}

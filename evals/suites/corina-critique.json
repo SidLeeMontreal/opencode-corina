@@ -1,0 +1,13 @@
+{
+  "name": "corina-critique",
+  "corpus": "../corpus/corina-corpus.json",
+  "runner": {
+    "module": "../runners/corina-runner.mjs",
+    "export": "runCorinaEvalCase"
+  },
+  "tiers": [1, 2],
+  "judgeAgent": "corina-critic",
+  "filter": {
+    "capability": ["critique"]
+  }
+}

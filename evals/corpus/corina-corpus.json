@@ -1,0 +1,631 @@
+{
+  "id": "corina-corpus",
+  "version": "2026-04-10.1",
+  "cases": [
+    {
+      "id": "tone-ai-to-journalist",
+      "label": "Heavy AI copy to journalist voice",
+      "input": {
+        "text": "In today's rapidly evolving landscape, our organization is uniquely positioned to leverage transformative AI capabilities across the full creative tapestry of the business.",
+        "voice": "journalist",
+        "format": "article",
+        "candidate": "The agency says it is using AI more broadly across its creative work. The shift touches planning, production and internal operations."
+      },
+      "capability": "tone",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "landscape",
+          "leverage",
+          "tapestry"
+        ],
+        "must_contain": [
+          "agency",
+          "AI"
+        ],
+        "must_preserve": [
+          "AI",
+          "creative"
+        ],
+        "notes": [
+          "Should sound restrained, not promotional."
+        ]
+      },
+      "tags": [
+        "ai-heavy",
+        "journalistic"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "tone-technical-to-social",
+      "label": "Technical source rewritten for social",
+      "input": {
+        "text": "The release adds structured audit logs, per-step model routing, and strict schema validation across the editorial pipeline.",
+        "voice": "social",
+        "format": "social",
+        "candidate": "New in Corina: audit logs, step-level model routing and stronger schema checks. Cleaner writing workflow, less guesswork."
+      },
+      "capability": "tone",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "delve",
+          "intricate"
+        ],
+        "must_contain": [
+          "audit logs",
+          "schema"
+        ],
+        "must_preserve": [
+          "model routing"
+        ]
+      },
+      "tags": [
+        "technical",
+        "social"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "tone-minimal-to-personal",
+      "label": "Minimal brief rewritten in personal voice",
+      "input": {
+        "text": "We shipped the first version. It still feels rough, but it works.",
+        "voice": "personal",
+        "candidate": "We shipped the first version. It's still a little rough around the edges, but it works \u2014 and that's enough to learn from."
+      },
+      "capability": "tone",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "tapestry",
+          "game-changing"
+        ],
+        "must_contain": [
+          "works"
+        ],
+        "must_preserve": [
+          "first version"
+        ]
+      },
+      "tags": [
+        "minimal",
+        "personal"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "tone-exec-to-email",
+      "label": "Executive text rewritten as email",
+      "input": {
+        "text": "We need a concise update for leadership on the Montreal launch risk and the Q4 revenue impact.",
+        "voice": "email",
+        "format": "email",
+        "candidate": "Subject: Montreal launch update\n\nQuick note: the main risk is timing on the Montreal launch, and any slip will affect Q4 revenue. I'll send options this afternoon."
+      },
+      "capability": "tone",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "vibrant",
+          "meticulous"
+        ],
+        "must_contain": [
+          "Subject:",
+          "Montreal",
+          "Q4"
+        ],
+        "must_preserve": [
+          "revenue"
+        ]
+      },
+      "tags": [
+        "executive",
+        "email"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "detect-ai-heavy-likely-ai",
+      "label": "Detect heavily AI-ish text",
+      "input": {
+        "text": "This output showcases a vibrant tapestry of transformative opportunities that underscore a pivotal new era.",
+        "candidate": "Verdict: likely_ai\nSummary: The text relies on promotional abstraction, AI vocabulary and synthetic gravitas."
+      },
+      "capability": "detect",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "probably_human"
+        ],
+        "must_contain": [
+          "likely_ai"
+        ],
+        "verdict": [
+          "likely_ai"
+        ]
+      },
+      "tags": [
+        "ai-heavy",
+        "detect"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "detect-journalistic-probably-human",
+      "label": "Detect journalistic paragraph as probably human",
+      "input": {
+        "text": "The company said Thursday that it will close the plant in June and move 120 jobs to Montreal.",
+        "candidate": "Verdict: probably_human\nSummary: The passage is direct, factual and low on AI-pattern density."
+      },
+      "capability": "detect",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "likely_ai"
+        ],
+        "must_contain": [
+          "probably_human"
+        ],
+        "verdict": [
+          "probably_human",
+          "clean"
+        ]
+      },
+      "tags": [
+        "journalistic",
+        "detect"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "detect-technical-clean",
+      "label": "Detect technical copy as clean",
+      "input": {
+        "text": "The API returns a typed envelope with agent, capability, version, timestamp, artifact and rendered fields.",
+        "candidate": "Verdict: clean\nSummary: Technical, literal wording with little rhetorical inflation."
+      },
+      "capability": "detect",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "likely_ai"
+        ],
+        "must_contain": [
+          "clean"
+        ],
+        "verdict": [
+          "clean",
+          "probably_human"
+        ]
+      },
+      "tags": [
+        "technical",
+        "detect"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "detect-borderline-possibly-ai",
+      "label": "Detect borderline text as possibly AI",
+      "input": {
+        "text": "The update is valuable because it provides a clear framework, but some phrases still feel polished in a generic way.",
+        "candidate": "Verdict: possibly_ai\nSummary: Mostly readable, but a few generic signals keep it from a clean result."
+      },
+      "capability": "detect",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "clean\nSummary"
+        ],
+        "must_contain": [
+          "possibly_ai"
+        ],
+        "verdict": [
+          "possibly_ai"
+        ]
+      },
+      "tags": [
+        "borderline",
+        "detect"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-quality-ai-fails",
+      "label": "Quality critique should fail AI-ish copy",
+      "input": {
+        "text": "Our groundbreaking solution unlocks a transformative tapestry of possibilities across the organization.",
+        "mode": "quality",
+        "candidate": "Pass: false\nVerdict: likely_ai\nOverall: 10/25\nMain issue: promotional abstraction overwhelms meaning."
+      },
+      "capability": "critique",
+      "mode": "quality",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "Pass: true"
+        ],
+        "must_contain": [
+          "Pass: false"
+        ],
+        "verdict": [
+          "likely_ai",
+          "possibly_ai"
+        ]
+      },
+      "tags": [
+        "critique",
+        "quality",
+        "ai-heavy"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-quality-good-passes",
+      "label": "Quality critique should pass strong copy",
+      "input": {
+        "text": "The launch slipped by two weeks, but the team kept the scope intact and avoided additional spend.",
+        "mode": "quality",
+        "candidate": "Pass: true\nOverall: 22/25\nStrength: precise, restrained, useful. It preserves the delay of two weeks clearly."
+      },
+      "capability": "critique",
+      "mode": "quality",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "Pass: false"
+        ],
+        "must_contain": [
+          "Pass: true"
+        ],
+        "must_preserve": [
+          "two weeks"
+        ]
+      },
+      "tags": [
+        "critique",
+        "quality",
+        "good"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-quality-borderline",
+      "label": "Quality critique borderline case",
+      "input": {
+        "text": "The post is clear enough, but it slides into a polished, slightly generic rhythm by the end.",
+        "mode": "quality",
+        "candidate": "Pass: false\nOverall: 18/25\nIssue: readable, but still too generic to clear the bar."
+      },
+      "capability": "critique",
+      "mode": "quality",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "22/25"
+        ],
+        "must_contain": [
+          "generic"
+        ],
+        "must_preserve": [
+          "clear"
+        ]
+      },
+      "tags": [
+        "critique",
+        "quality",
+        "borderline"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-quality-empty",
+      "label": "Quality critique on empty input",
+      "input": {
+        "text": "",
+        "mode": "quality",
+        "candidate": "Pass: false\nOverall: 0/25\nIssue: no input text was provided."
+      },
+      "capability": "critique",
+      "mode": "quality",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "Pass: true"
+        ],
+        "must_contain": [
+          "no input"
+        ],
+        "allow_empty": true
+      },
+      "tags": [
+        "critique",
+        "quality",
+        "empty"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-audience-tech-for-cmo",
+      "label": "Audience critique catches technical copy for CMO",
+      "input": {
+        "text": "The service now emits typed envelopes and propagates schema validation across downstream adapters.",
+        "mode": "audience",
+        "audience": "CMO",
+        "candidate": "Resonance: low\nMiss: too much implementation jargon and schema detail for a CMO audience."
+      },
+      "capability": "critique",
+      "mode": "audience",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "Resonance: high"
+        ],
+        "must_contain": [
+          "CMO",
+          "jargon"
+        ],
+        "must_preserve": [
+          "schema"
+        ]
+      },
+      "tags": [
+        "critique",
+        "audience",
+        "cmo"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-audience-social-for-dev",
+      "label": "Audience critique catches vague social copy for developer",
+      "input": {
+        "text": "Big energy today. We shipped something new and exciting for the platform.",
+        "mode": "audience",
+        "audience": "developer",
+        "candidate": "Resonance: low\nMiss: too vague for a developer audience; needs specifics about the platform and terminology."
+      },
+      "capability": "critique",
+      "mode": "audience",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "Resonance: high"
+        ],
+        "must_contain": [
+          "developer",
+          "specifics"
+        ],
+        "must_preserve": [
+          "platform"
+        ]
+      },
+      "tags": [
+        "critique",
+        "audience",
+        "developer"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-audience-exec-fit",
+      "label": "Audience critique confirms executive fit",
+      "input": {
+        "text": "The launch risk is timing. If we slip by two weeks, Q4 revenue will move with it.",
+        "mode": "audience",
+        "audience": "executive",
+        "candidate": "Resonance: high\nWhat lands: concise, decision-oriented summary for an executive reader that keeps the Q4 risk visible."
+      },
+      "capability": "critique",
+      "mode": "audience",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "jargon"
+        ],
+        "must_contain": [
+          "executive",
+          "decision-oriented"
+        ],
+        "must_preserve": [
+          "Q4"
+        ]
+      },
+      "tags": [
+        "critique",
+        "audience",
+        "executive"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "critique-audience-empty",
+      "label": "Audience critique on empty input",
+      "input": {
+        "text": "",
+        "mode": "audience",
+        "audience": "developer",
+        "candidate": "Resonance: low\nMiss: no input text was available to evaluate for the developer audience."
+      },
+      "capability": "critique",
+      "mode": "audience",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "Resonance: high"
+        ],
+        "must_contain": [
+          "no input"
+        ],
+        "allow_empty": true
+      },
+      "tags": [
+        "critique",
+        "audience",
+        "empty"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "pipeline-complete-brief",
+      "label": "Pipeline complete brief produces usable output",
+      "input": {
+        "text": "Write a crisp internal memo explaining why the Montreal launch slipped by two weeks and what happens next.",
+        "candidate": "Montreal launch update\n\nThe launch slipped by two weeks because final approvals landed late. Scope and budget remain intact, and the next decision point is Friday."
+      },
+      "capability": "pipeline",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "tapestry",
+          "game-changing"
+        ],
+        "must_contain": [
+          "Montreal",
+          "two weeks"
+        ],
+        "must_preserve": [
+          "Friday"
+        ]
+      },
+      "tags": [
+        "pipeline",
+        "complete-brief"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "pipeline-minimal-brief",
+      "label": "Pipeline minimal brief still returns something usable",
+      "input": {
+        "text": "Need a short update about the launch.",
+        "candidate": "Quick launch update: timing is still the main issue, and we should confirm the revised date before sharing widely."
+      },
+      "capability": "pipeline",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "delve",
+          "meticulous"
+        ],
+        "must_contain": [
+          "launch",
+          "timing"
+        ]
+      },
+      "tags": [
+        "pipeline",
+        "minimal"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "pipeline-missing-evidence",
+      "label": "Pipeline output reveals missing evidence",
+      "input": {
+        "text": "Draft a confident article about the product impact, but the brief provides no numbers or proof points.",
+        "candidate": "The draft stays cautious because the brief does not provide evidence, numbers or confirmed outcomes yet."
+      },
+      "capability": "pipeline",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "guaranteed",
+          "transformative"
+        ],
+        "must_contain": [
+          "does not provide evidence"
+        ],
+        "must_preserve": [
+          "numbers"
+        ]
+      },
+      "tags": [
+        "pipeline",
+        "missing-evidence"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "pipeline-empty-brief",
+      "label": "Pipeline empty brief degrades safely",
+      "input": {
+        "text": "",
+        "candidate": "I need a little more context before I can draft this safely."
+      },
+      "capability": "pipeline",
+      "expected": {
+        "score_min": 3,
+        "must_not_contain": [
+          "transformative"
+        ],
+        "must_contain": [
+          "more context"
+        ],
+        "allow_empty": true
+      },
+      "tags": [
+        "pipeline",
+        "empty"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "adversarial-garbage-content",
+      "label": "Schema-correct but garbage content should not pass",
+      "input": {
+        "text": "Rewrite this text clearly.",
+        "voice": "journalist",
+        "candidate": "Rewrite this clearly: the first pass is rough, but the core point is there and the language should stay direct."
+      },
+      "capability": "tone",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "placeholder"
+        ],
+        "must_contain": [
+          "Rewrite"
+        ],
+        "notes": [
+          "Designed to catch fluent nonsense and false passes."
+        ]
+      },
+      "tags": [
+        "adversarial",
+        "false-pass"
+      ],
+      "tier": 1
+    },
+    {
+      "id": "adversarial-fact-loss",
+      "label": "Polished rewrite that drops a key fact",
+      "input": {
+        "text": "The Montreal launch slipped by two weeks and kept the $2.4M budget intact.",
+        "voice": "executive",
+        "candidate": "The Montreal launch slipped by two weeks, but the $2.4M budget remains intact and the overall plan holds."
+      },
+      "capability": "tone",
+      "expected": {
+        "score_min": 4,
+        "must_not_contain": [
+          "transformative"
+        ],
+        "must_preserve": [
+          "two weeks",
+          "$2.4M"
+        ],
+        "notes": [
+          "Designed to catch smooth but lossy rewrites."
+        ]
+      },
+      "tags": [
+        "adversarial",
+        "fact-loss"
+      ],
+      "tier": 1
+    }
+  ]
+}

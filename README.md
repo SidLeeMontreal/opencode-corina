@@ -93,3 +93,36 @@ Suggested workflow:
 
 - This package is scaffolded for local development and has **not** been published to npm.
 - `@opencode-ai/plugin` types are currently represented by local TypeScript stubs so the package can compile today.
+
+
+## Evaluation workflow
+
+Corina now uses the sibling `opencode-eval-harness` package for structured eval runs.
+
+### Corpus and suites
+
+- Corpus: `evals/corpus/corina-corpus.json`
+- Suites: `evals/suites/`
+- Runner module: `evals/runners/corina-runner.mjs`
+- Baselines: `evals/baselines/`
+- Reports: `evals/reports/`
+
+### Commands
+
+```bash
+npm run eval:tier1     # offline deterministic Tier 1 run
+npm run eval:tier2     # live Tier 2 judge run (requires OpenCode server)
+npm run eval:baseline  # live Tier 2 run and save baseline
+```
+
+### Tier behavior
+
+- **Tier 1** uses fixture-backed candidate outputs and programmatic checks only.
+- **Tier 2** runs live Corina capabilities and scores them with a judge agent.
+- `scripts/run-eval.mjs` is now a thin wrapper around `opencode-eval-harness`.
+
+### Baselines and reports
+
+- Baselines default to `evals/baselines/{suite-name}.json`
+- Saved reports land in `evals/reports/`
+- PR CI runs Tier 1 only via `.github/workflows/eval-tier1.yml`

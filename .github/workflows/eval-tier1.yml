@@ -1,0 +1,43 @@
+name: eval-tier1
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  eval-tier1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Corina
+        uses: actions/checkout@v4
+        with:
+          path: opencode-corina
+
+      - name: Checkout eval harness
+        uses: actions/checkout@v4
+        with:
+          repository: SidLeeMontreal/opencode-eval-harness
+          path: opencode-eval-harness
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build eval harness
+        working-directory: opencode-eval-harness
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Corina deps
+        working-directory: opencode-corina
+        run: npm ci
+
+      - name: Build Corina
+        working-directory: opencode-corina
+        run: npm run build
+
+      - name: Run Tier 1 eval
+        working-directory: opencode-corina
+        run: npm run eval:tier1
