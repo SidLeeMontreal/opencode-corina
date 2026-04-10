@@ -48,4 +48,76 @@ describe("tone schemas", () => {
     expect(result.valid).toBe(true)
     expect(result.errors).toEqual([])
   })
+
+  it("passes valid detection schemas", () => {
+    const layer2 = validate("Layer2Analysis", {
+      ran: true,
+      score_adjustment: 0.04,
+      confirmed_patterns: ["ai_vocabulary"],
+      dismissed_patterns: [],
+      additional_findings: [],
+      reasoning_notes: ["Confirmed by surrounding promotional phrasing."],
+    })
+
+    const report = validate("DetectionReport", {
+      overall_score: 0.58,
+      confidence: "medium",
+      verdict: "possibly_ai",
+      summary: "Several AI-like patterns appear, but this is not proof of authorship.",
+      input: {
+        source_type: "text",
+        source_path: null,
+        character_count: 120,
+        word_count: 20,
+        paragraph_count: 1,
+        sentence_count: 2,
+      },
+      patterns_found: [
+        {
+          pattern_id: "ai_vocabulary",
+          pattern_name: "AI vocabulary words",
+          category: "language",
+          severity: "medium",
+          confidence: "high",
+          matched_text: "Additionally",
+          normalized_match: "additionally",
+          location_hint: "paragraph 1, sentence 1",
+          char_start: 0,
+          char_end: 12,
+          rule_source: "layer_1",
+          explanation: "Generic connector.",
+          fix_suggestion: "Delete it.",
+          context_before: "",
+          context_after: "the platform...",
+        },
+      ],
+      pattern_counts: {
+        by_pattern: { ai_vocabulary: 1 },
+        by_category: { language: 1 },
+        by_severity: { high: 0, medium: 1, low: 0 },
+      },
+      top_signals: ["AI vocabulary words x1 near paragraph 1, sentence 1"],
+      layer_1_scan: {
+        score: 0.32,
+        deep_recommended: true,
+        rules_triggered: ["ai_vocabulary"],
+        ambiguous_patterns: [],
+        notes: ["Signals: clustered_ai_vocabulary."],
+      },
+      layer_2_analysis: {
+        ran: true,
+        score_adjustment: 0.04,
+        confirmed_patterns: ["ai_vocabulary"],
+        dismissed_patterns: [],
+        additional_findings: [],
+        reasoning_notes: ["Confirmed by surrounding promotional phrasing."],
+      },
+      assumptions: ["Verdict describes pattern density, not proven authorship."],
+    })
+
+    expect(layer2.valid).toBe(true)
+    expect(layer2.errors).toEqual([])
+    expect(report.valid).toBe(true)
+    expect(report.errors).toEqual([])
+  })
 })

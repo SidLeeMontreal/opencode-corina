@@ -573,7 +573,8 @@ export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClien
     ? loadPrompt(voiceProfilePath)
     : `Voice profile missing for ${voice}. Preserve facts. Produce usable output.`;
 
-  const firstPass = await runWriter(client, inputArtifact, voiceProfile);
+  const firstPassInstructions = input.fixInstructions?.length ? input.fixInstructions : undefined;
+  const firstPass = await runWriter(client, inputArtifact, voiceProfile, firstPassInstructions);
   let rewrittenContent = firstPass.rewrittenContent || originalText;
   assumptions.push(...firstPass.assumptions);
 

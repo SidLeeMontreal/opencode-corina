@@ -18,6 +18,11 @@ export type ToneVoice =
   | "personal";
 
 export type ToneFormat = "article" | "social" | "slide" | "email" | "brief" | "other";
+export type DetectionFormat = "inline" | "report" | "json";
+export type DetectionConfidence = "high" | "medium" | "low";
+export type DetectionVerdict = "clean" | "probably_human" | "possibly_ai" | "likely_ai";
+export type DetectionRuleSource = "layer_1" | "layer_2";
+export type DetectionCategory = "content" | "language" | "style" | "communication" | "filler";
 
 export interface PipelineModelConfig {
   provider: string;
@@ -167,6 +172,89 @@ export interface ToneRawInput {
   toneDesc?: string;
   toneFile?: string;
   profile?: string;
+  modelPreset?: string;
+  fixInstructions?: string[];
+}
+
+export interface PatternFinding {
+  pattern_id: string;
+  pattern_name: string;
+  category: DetectionCategory;
+  severity: DetectionConfidence;
+  confidence: DetectionConfidence;
+  matched_text: string;
+  normalized_match: string;
+  location_hint: string;
+  char_start: number;
+  char_end: number;
+  rule_source: DetectionRuleSource;
+  explanation: string;
+  fix_suggestion: string;
+  context_before: string;
+  context_after: string;
+}
+
+export interface DetectionReportInput {
+  source_type: "text" | "file";
+  source_path: string | null;
+  character_count: number;
+  word_count: number;
+  paragraph_count: number;
+  sentence_count: number;
+}
+
+export interface DetectionPatternCounts {
+  by_pattern: Record<string, number>;
+  by_category: Record<string, number>;
+  by_severity: Record<DetectionConfidence, number>;
+}
+
+export interface DetectionLayer1ScanSummary {
+  score: number;
+  deep_recommended: boolean;
+  rules_triggered: string[];
+  ambiguous_patterns: string[];
+  notes: string[];
+}
+
+export interface Layer2AdditionalFinding {
+  pattern_id: string;
+  matched_text: string;
+  location_hint?: string;
+  explanation: string;
+  severity: DetectionConfidence;
+  confidence: DetectionConfidence;
+  fix_suggestion: string;
+}
+
+export interface Layer2Analysis {
+  ran: boolean;
+  score_adjustment: number;
+  confirmed_patterns: string[];
+  dismissed_patterns: string[];
+  reasoning_notes: string[];
+  additional_findings: Layer2AdditionalFinding[];
+}
+
+export interface DetectionReport {
+  overall_score: number;
+  confidence: DetectionConfidence;
+  verdict: DetectionVerdict;
+  summary: string;
+  input: DetectionReportInput;
+  patterns_found: PatternFinding[];
+  pattern_counts: DetectionPatternCounts;
+  top_signals: string[];
+  layer_1_scan: DetectionLayer1ScanSummary;
+  layer_2_analysis: Layer2Analysis | null;
+  assumptions: string[];
+}
+
+export interface DetectionRawInput {
+  text: string;
+  format?: DetectionFormat;
+  autoFix?: boolean;
+  voice?: string;
   modelPreset?: string;
 }
 

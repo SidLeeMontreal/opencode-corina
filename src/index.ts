@@ -3,6 +3,7 @@ import { tool } from "@opencode-ai/plugin";
 import type { StepModelConfig } from "opencode-model-resolver";
 
 import { writeAuditLog } from "./audit-log.js";
+import { runDetect } from "./detect.js";
 import { runPipeline } from "./pipeline.js";
 import { runTonePipeline } from "./tone-pipeline.js";
 import type { PipelineModelConfig } from "./types.js";
@@ -81,6 +82,35 @@ export const CorinaPlugin: Plugin = async (input) => {
             },
           });
           return output.final_content;
+        },
+      }),
+      corina_detect: tool({
+        description:
+          "Detect AI-writing patterns in text. Returns annotated analysis, confidence scores, severity flags, and actionable fix suggestions. Never rewrites — diagnostic only. All params optional except text.",
+        args: {
+          text: tool.schema.string().describe("Text to analyze or a readable file path."),
+          format: tool.schema.string().optional(),
+          autoFix: tool.schema.boolean().optional(),
+          voice: tool.schema.string().optional(),
+          modelPreset: tool.schema.string().optional(),
+        },
+        execute: async ({ text, format, autoFix, voice, modelPreset }, toolCtx) => {
+          const output = await runDetect({ text, format: format as any, autoFix, voice, modelPreset }, input.client);
+          writeAuditLog({
+            timestamp: new Date().toISOString(),
+            event: "corina_detect",
+            sessionId: toolCtx.sessionID,
+            briefPreview: text.slice(0, 160),
+            outcome: "completed",
+            metadata: {
+              format,
+              autoFix,
+              voice,
+              modelPreset,
+              outputLength: output.length,
+            },
+          });
+          return output;
         },
       }),
     },

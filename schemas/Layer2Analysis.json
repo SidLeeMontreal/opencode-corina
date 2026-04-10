@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Layer2Analysis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ran",
+    "confirmed_patterns",
+    "dismissed_patterns",
+    "reasoning_notes",
+    "score_adjustment",
+    "additional_findings"
+  ],
+  "properties": {
+    "ran": { "type": "boolean" },
+    "score_adjustment": { "type": "number", "minimum": -0.5, "maximum": 0.5 },
+    "confirmed_patterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dismissed_patterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "additional_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pattern_id",
+          "matched_text",
+          "explanation",
+          "severity",
+          "confidence",
+          "fix_suggestion"
+        ],
+        "properties": {
+          "pattern_id": { "type": "string" },
+          "matched_text": { "type": "string" },
+          "location_hint": { "type": "string" },
+          "explanation": { "type": "string" },
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "fix_suggestion": { "type": "string" }
+        }
+      }
+    },
+    "reasoning_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
