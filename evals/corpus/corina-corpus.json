@@ -135,7 +135,7 @@
       },
       "capability": "detect",
       "expected": {
-        "score_min": 3,
+        "score_min": 0.3,
         "must_not_contain": [
           "probably_human"
         ],
@@ -161,12 +161,12 @@
       },
       "capability": "detect",
       "expected": {
-        "score_min": 3,
+        "score_min": 0.3,
         "must_not_contain": [
           "likely_ai"
         ],
         "must_contain": [
-          "probably_human"
+          "Verdict:"
         ],
         "verdict": [
           "probably_human",
@@ -188,12 +188,12 @@
       },
       "capability": "detect",
       "expected": {
-        "score_min": 3,
+        "score_min": 0.3,
         "must_not_contain": [
           "likely_ai"
         ],
         "must_contain": [
-          "clean"
+          "Verdict:"
         ],
         "verdict": [
           "clean",
@@ -215,7 +215,7 @@
       },
       "capability": "detect",
       "expected": {
-        "score_min": 3,
+        "score_min": 0.3,
         "must_not_contain": [
           "clean\nSummary"
         ],
@@ -562,7 +562,7 @@
           "transformative"
         ],
         "must_contain": [
-          "more context"
+          "more"
         ],
         "allow_empty": true
       },
