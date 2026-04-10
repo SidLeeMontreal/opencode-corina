@@ -105,7 +105,7 @@ const DELIMITERS = {
   reconciliation: ["<concise_reconciliation>", "</concise_reconciliation>"],
 } as const;
 
-function countWords(text: string): number {
+export function countWords(text: string): number {
   const trimmed = text.trim();
   return trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
 }
@@ -118,7 +118,7 @@ export function detectMode(text: string, requested?: string): "quick" | "full" {
   return countWords(text) <= 500 ? "quick" : "full";
 }
 
-function splitParagraphs(text: string): ParagraphUnit[] {
+export function splitParagraphs(text: string): ParagraphUnit[] {
   const normalized = text.replace(/\r\n/g, "\n").trim();
   if (!normalized) {
     return [];
@@ -152,7 +152,7 @@ function unwrapData<T>(response: unknown): T {
   return response as T;
 }
 
-function normalizeHeatMap(entries: unknown): HeatMapEntry[] {
+export function normalizeHeatMap(entries: unknown): HeatMapEntry[] {
   if (!Array.isArray(entries)) {
     return [];
   }
@@ -173,7 +173,7 @@ function normalizeHeatMap(entries: unknown): HeatMapEntry[] {
     .filter((entry) => entry.count > 0 || entry.tag !== "UNKNOWN");
 }
 
-function normalizeRevisionLog(entries: unknown): RevisionLogEntry[] {
+export function normalizeRevisionLog(entries: unknown): RevisionLogEntry[] {
   if (!Array.isArray(entries)) {
     return [];
   }
@@ -194,7 +194,7 @@ function normalizeRevisionLog(entries: unknown): RevisionLogEntry[] {
     }));
 }
 
-function normalizePreservationCheck(value: unknown, note?: string): PreservationCheck {
+export function normalizePreservationCheck(value: unknown, note?: string): PreservationCheck {
   if (!value || typeof value !== "object") {
     return note ? { ...DEFAULT_PRESERVATION_CHECK, notes: note } : { ...DEFAULT_PRESERVATION_CHECK };
   }
@@ -215,7 +215,7 @@ function normalizePreservationCheck(value: unknown, note?: string): Preservation
   };
 }
 
-function normalizeParagraphFunctionMap(entries: unknown, paragraphs: ParagraphUnit[]): ParagraphFunctionEntry[] {
+export function normalizeParagraphFunctionMap(entries: unknown, paragraphs: ParagraphUnit[]): ParagraphFunctionEntry[] {
   if (!Array.isArray(entries) || entries.length === 0) {
     return paragraphs.map((paragraph) => ({
       paragraph: paragraph.id,
@@ -251,7 +251,7 @@ function normalizeParagraphFunctionMap(entries: unknown, paragraphs: ParagraphUn
     }));
 }
 
-function normalizeReconciliationLog(entries: unknown): ReconciliationEntry[] {
+export function normalizeReconciliationLog(entries: unknown): ReconciliationEntry[] {
   if (!Array.isArray(entries)) {
     return [];
   }
@@ -271,7 +271,7 @@ function normalizeReconciliationLog(entries: unknown): ReconciliationEntry[] {
     }));
 }
 
-function buildHeatMapFromAuditRows(rows: ConciseAuditRow[]): HeatMapEntry[] {
+export function buildHeatMapFromAuditRows(rows: ConciseAuditRow[]): HeatMapEntry[] {
   const map = new Map<string, number>();
 
   for (const row of rows) {
@@ -291,7 +291,7 @@ function buildHeatMapFromAuditRows(rows: ConciseAuditRow[]): HeatMapEntry[] {
   });
 }
 
-function summarizeHeatMap(heatMap: HeatMapEntry[]): string {
+export function summarizeHeatMap(heatMap: HeatMapEntry[]): string {
   if (!heatMap.length) {
     return "none";
   }
@@ -299,7 +299,7 @@ function summarizeHeatMap(heatMap: HeatMapEntry[]): string {
   return heatMap.map((entry) => `${entry.tag} ${entry.severity}:${entry.count}`).join(", ");
 }
 
-function buildRendered(mode: "quick" | "full", draft: string, originalWordCount: number, revisedWordCount: number, heatMap: HeatMapEntry[]): string {
+export function buildRendered(mode: "quick" | "full", draft: string, originalWordCount: number, revisedWordCount: number, heatMap: HeatMapEntry[]): string {
   const ratio = originalWordCount > 0 ? revisedWordCount / originalWordCount : 1;
   const reductionPercent = Math.round((1 - ratio) * 100);
   const reductionLabel = reductionPercent >= 0 ? `-${reductionPercent}%` : `+${Math.abs(reductionPercent)}%`;
@@ -319,7 +319,7 @@ function defaultParagraphFunctionMap(text: string): ParagraphFunctionEntry[] {
   return normalizeParagraphFunctionMap([], splitParagraphs(text));
 }
 
-function buildFallbackArtifact(
+export function buildFallbackArtifact(
   text: string,
   mode: "quick" | "full",
   note: string,
@@ -348,7 +348,7 @@ function buildFallbackArtifact(
   };
 }
 
-function extractDelimitedJson<T>(text: string, startTag: string, endTag: string): T {
+export function extractDelimitedJson<T>(text: string, startTag: string, endTag: string): T {
   const start = text.indexOf(startTag);
   const end = text.lastIndexOf(endTag);
 
@@ -607,7 +607,7 @@ function buildReconciliationPrompt(originalText: string, stitchedDraft: string, 
   ].join("\n");
 }
 
-function replaceParagraphById(text: string, paragraphId: string, newParagraph: string): string {
+export function replaceParagraphById(text: string, paragraphId: string, newParagraph: string): string {
   const paragraphs = splitParagraphs(text);
   if (!paragraphs.length) {
     return newParagraph.trim();
@@ -701,7 +701,7 @@ async function runQuickMode(
   return finalizeOutput(artifact, usage, logger, startMs);
 }
 
-function sortRevisionTargets(paragraphMap: ParagraphFunctionEntry[]): ParagraphFunctionEntry[] {
+export function sortRevisionTargets(paragraphMap: ParagraphFunctionEntry[]): ParagraphFunctionEntry[] {
   const priorityRank: Record<ParagraphFunctionEntry["compression_priority"], number> = {
     High: 0,
     Medium: 1,
