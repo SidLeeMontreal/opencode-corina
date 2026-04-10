@@ -41,10 +41,10 @@
               "dimension_deltas": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"],
+                "required": ["ai_patterns", "tone", "precision", "evidence", "rhythm"],
                 "properties": {
                   "ai_patterns": { "type": "number" },
-                  "corina_tone": { "type": "number" },
+                  "tone": { "type": "number" },
                   "precision": { "type": "number" },
                   "evidence": { "type": "number" },
                   "rhythm": { "type": "number" }
@@ -82,7 +82,7 @@
       "required": ["id", "dimension", "severity", "summary", "fix_direction"],
       "properties": {
         "id": { "type": "string" },
-        "dimension": { "type": "string", "enum": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"] },
+        "dimension": { "type": "string", "enum": ["ai_patterns", "tone", "precision", "evidence", "rhythm"] },
         "severity": { "type": "string", "enum": ["high", "medium", "low"] },
         "summary": { "type": "string" },
         "fix_direction": { "type": "string" }
@@ -111,10 +111,10 @@
         "dimensions": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"],
+          "required": ["ai_patterns", "tone", "precision", "evidence", "rhythm"],
           "properties": {
             "ai_patterns": { "$ref": "#/definitions/dimension" },
-            "corina_tone": { "$ref": "#/definitions/dimension" },
+            "tone": { "$ref": "#/definitions/dimension" },
             "precision": { "$ref": "#/definitions/dimension" },
             "evidence": { "$ref": "#/definitions/dimension" },
             "rhythm": { "$ref": "#/definitions/dimension" }

@@ -36,7 +36,7 @@ describe("validators", () => {
       overall_score: 22,
       dimensions: {
         ai_patterns: { score: 5, issues: [] },
-        corina_tone: { score: 4, issues: [] },
+        tone: { score: 4, issues: [] },
         precision: { score: 4, issues: [] },
         evidence: { score: 4, issues: [] },
         rhythm: { score: 5, issues: [] },
@@ -54,7 +54,7 @@ describe("validators", () => {
       overall_score: 22,
       dimensions: {
         ai_patterns: { score: 6, issues: ["Too polished"] },
-        corina_tone: { score: 4, issues: [] },
+        tone: { score: 4, issues: [] },
         precision: { score: 4, issues: [] },
         evidence: { score: 4, issues: [] },
         rhythm: { score: 5, issues: [] },

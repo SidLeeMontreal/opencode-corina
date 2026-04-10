@@ -6,7 +6,7 @@
     "export": "runCorinaEvalCase"
   },
   "tiers": [1, 2],
-  "judgeAgent": "corina-critic",
+  "judgeAgent": "critic",
   "filter": {
     "capability": ["pipeline"]
   }

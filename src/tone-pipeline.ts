@@ -372,12 +372,12 @@ async function runWriter(
   const sessionResponse = await client.session.create({ body: { title: "Corina tone writer" } });
   const session = unwrapData<{ id: string }>(sessionResponse);
 
-  logger.debug("session_created", { capability: "tone", step: "rewrite", session_id: session.id, agent: "corina-tone-writer" });
+  logger.debug("session_created", { capability: "tone", step: "rewrite", session_id: session.id, agent: "tone-writer" });
 
   try {
     const primerStartMs = Date.now();
     const primerResult = await promptSession(client, session.id, {
-      agent: "corina-tone-writer",
+      agent: "tone-writer",
       noReply: true,
       parts: [{ type: "text", text: loadPrompt("tasks/tone-writer.md") }],
     });
@@ -387,7 +387,7 @@ async function runWriter(
 
     const resultStartMs = Date.now();
     const result = await promptSession(client, session.id, {
-      agent: "corina-tone-writer",
+      agent: "tone-writer",
       parts: [
         {
           type: "text",
@@ -428,12 +428,12 @@ async function runValidator(
   const sessionResponse = await client.session.create({ body: { title: "Corina tone validator" } });
   const session = unwrapData<{ id: string }>(sessionResponse);
 
-  logger.debug("session_created", { capability: "tone", step: "validate", session_id: session.id, agent: "corina-tone-validator" });
+  logger.debug("session_created", { capability: "tone", step: "validate", session_id: session.id, agent: "tone-validator" });
 
   try {
     const primerStartMs = Date.now();
     const primerResult = await promptSession(client, session.id, {
-      agent: "corina-tone-validator",
+      agent: "tone-validator",
       noReply: true,
       parts: [{ type: "text", text: loadPrompt("tasks/tone-validator.md") }],
     });
@@ -443,7 +443,7 @@ async function runValidator(
 
     const resultStartMs = Date.now();
     const result = await promptSession(client, session.id, {
-      agent: "corina-tone-validator",
+      agent: "tone-validator",
       parts: [
         {
           type: "text",

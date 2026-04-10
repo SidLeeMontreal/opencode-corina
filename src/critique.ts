@@ -228,7 +228,7 @@ function buildEmptyCritiqueReport(note: string, assumptions: string[]): Critique
     pass_threshold: 20,
     dimensions: {
       ai_patterns: emptyDimension,
-      corina_tone: emptyDimension,
+      tone: emptyDimension,
       precision: emptyDimension,
       evidence: emptyDimension,
       rhythm: emptyDimension,
@@ -293,7 +293,7 @@ function buildFallbackQualityReport(text: string, assumptions: string[], error: 
       : match.category === "style"
         ? "rhythm"
         : match.category === "communication"
-          ? "corina_tone"
+          ? "tone"
           : "precision") as CritiqueReport["issues"][number]["dimension"],
     severity: match.severity,
     summary: `${match.explanation} (${match.locationHint})`,
@@ -330,9 +330,9 @@ function buildFallbackQualityReport(text: string, assumptions: string[], error: 
         issues: issues.filter((issue) => issue.dimension === "ai_patterns").map((issue) => issue.summary),
         strengths: scan.counts.totalMatches === 0 ? ["Local scan found few explicit AI-pattern signals."] : [],
       },
-      corina_tone: {
+      tone: {
         score: toneScore,
-        issues: issues.filter((issue) => issue.dimension === "corina_tone").map((issue) => issue.summary),
+        issues: issues.filter((issue) => issue.dimension === "tone").map((issue) => issue.summary),
         strengths: [],
       },
       precision: {
@@ -487,7 +487,7 @@ function buildRubricPrompt(input: {
 function enrichQualityReport(report: CritiqueReport, inheritedAssumptions: string[]): CritiqueReport {
   const issues = Array.isArray(report.issues) ? report.issues : [];
   const strengths = Array.isArray(report.strengths) ? report.strengths : [];
-  const dimensionKeys = ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"] as const;
+  const dimensionKeys = ["ai_patterns", "tone", "precision", "evidence", "rhythm"] as const;
   const overallScore = dimensionKeys.reduce((sum, key) => sum + Number(report.dimensions[key]?.score ?? 0), 0);
   return {
     ...report,
@@ -722,7 +722,7 @@ async function runQualityMode(text: string, sourcePath: string | null, toneOutpu
     client,
     title: "Corina critique",
     step: "quality",
-    agent: "corina-critic",
+    agent: "critic",
     personaFile: "tasks/critic.md",
     schemaFile: "CritiqueReport.json",
     taskPrompt: buildQualityPrompt({ text, sourcePath, toneOutput, detectionReport, assumptions }),
@@ -809,7 +809,7 @@ export async function runCritiqueWithArtifact(
         client,
         title: "Corina audience critique",
         step: "audience",
-        agent: "corina-audience-critic",
+        agent: "audience-critic",
         personaFile: "tasks/audience-critic.md",
         schemaFile: "AudienceCritiqueReport.json",
         taskPrompt: buildAudiencePrompt({
@@ -862,7 +862,7 @@ export async function runCritiqueWithArtifact(
         client,
         title: "Corina rubric critique",
         step: "rubric",
-        agent: "corina-rubric-critic",
+        agent: "rubric-critic",
         personaFile: "tasks/rubric-critic.md",
         schemaFile: "RubricReport.json",
         taskPrompt: buildRubricPrompt({

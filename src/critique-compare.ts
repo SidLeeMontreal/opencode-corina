@@ -10,12 +10,12 @@ export interface VersionScore {
 
 export interface DeltaAnalysis extends ComparisonDelta {}
 
-const DIMENSIONS: CritiqueDimensionKey[] = ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"];
+const DIMENSIONS: CritiqueDimensionKey[] = ["ai_patterns", "tone", "precision", "evidence", "rhythm"];
 
 function buildDimensionDeltas(current: CritiqueReport, next: CritiqueReport): Record<CritiqueDimensionKey, number> {
   return {
     ai_patterns: current.dimensions.ai_patterns.score - next.dimensions.ai_patterns.score,
-    corina_tone: current.dimensions.corina_tone.score - next.dimensions.corina_tone.score,
+    tone: current.dimensions.tone.score - next.dimensions.tone.score,
     precision: current.dimensions.precision.score - next.dimensions.precision.score,
     evidence: current.dimensions.evidence.score - next.dimensions.evidence.score,
     rhythm: current.dimensions.rhythm.score - next.dimensions.rhythm.score,

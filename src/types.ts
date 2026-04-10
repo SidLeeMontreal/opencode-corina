@@ -76,7 +76,7 @@ export interface CritiqueArtifact {
   overall_score: number;
   dimensions: {
     ai_patterns: CritiqueDimensionScore;
-    corina_tone: CritiqueDimensionScore;
+    tone: CritiqueDimensionScore;
     precision: CritiqueDimensionScore;
     evidence: CritiqueDimensionScore;
     rhythm: CritiqueDimensionScore;
@@ -276,7 +276,7 @@ export type CritiqueMode = "quality" | "audience" | "rubric" | "compare";
 export type CritiqueRenderFormat = "inline" | "report" | "json";
 export type CritiqueChain = "tone" | "pipeline" | "detect";
 export type CritiqueStatus = "ok" | "no_input" | "degraded";
-export type CritiqueDimensionKey = "ai_patterns" | "corina_tone" | "precision" | "evidence" | "rhythm";
+export type CritiqueDimensionKey = "ai_patterns" | "tone" | "precision" | "evidence" | "rhythm";
 export type AudienceNeedGapType = "clarity" | "evidence" | "relevance" | "trust" | "terminology";
 
 export interface CritiqueDimensionDetail {

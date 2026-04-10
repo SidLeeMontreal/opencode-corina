@@ -17,7 +17,7 @@ export function formatCritiqueInline(report: CritiqueReport): string {
     "",
     "Dimensions",
     `- AI patterns: ${report.dimensions.ai_patterns.score}/5`,
-    `- Corina tone: ${report.dimensions.corina_tone.score}/5`,
+    `- Corina tone: ${report.dimensions.tone.score}/5`,
     `- Precision: ${report.dimensions.precision.score}/5`,
     `- Evidence: ${report.dimensions.evidence.score}/5`,
     `- Rhythm: ${report.dimensions.rhythm.score}/5`,

@@ -131,12 +131,12 @@ export async function runLayer2Analysis(
   const sessionResponse = await client.session.create({ body: { title: "Corina detect layer 2" } });
   const session = unwrapData<{ id: string }>(sessionResponse);
 
-  logger.debug("session_created", { capability: "detect", step: "layer2", session_id: session.id, agent: "corina-detector" });
+  logger.debug("session_created", { capability: "detect", step: "layer2", session_id: session.id, agent: "detector" });
 
   try {
     const primerStartMs = Date.now();
     const primerResult = await promptSession(client, session.id, {
-      agent: "corina-detector",
+      agent: "detector",
       noReply: true,
       parts: [{ type: "text", text: loadDetectorPrompt() }],
     });
@@ -146,7 +146,7 @@ export async function runLayer2Analysis(
 
     const resultStartMs = Date.now();
     const result = await promptSession(client, session.id, {
-      agent: "corina-detector",
+      agent: "detector",
       parts: [
         {
           type: "text",

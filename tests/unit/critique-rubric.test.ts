@@ -20,7 +20,7 @@ describe("critique rubric loader", () => {
     expect(rubric.dimensions).toHaveLength(5);
     expect(rubric.dimensions.map((dimension) => dimension.id)).toEqual([
       "ai_patterns",
-      "corina_tone",
+      "tone",
       "precision",
       "evidence",
       "rhythm",

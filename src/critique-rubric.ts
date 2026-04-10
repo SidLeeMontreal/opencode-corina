@@ -84,8 +84,12 @@ function parseFrontmatter(markdown: string): { frontmatter: ParsedFrontmatter; b
   return { frontmatter, body: body.trim() };
 }
 
+function normalizeDimensionId(id: string): string {
+  return id === "corina_tone" ? "tone" : id;
+}
+
 function toDimension(input: ParsedDimension | undefined, index: number): RubricDimension {
-  const id = String(input?.id ?? `dimension_${index + 1}`);
+  const id = normalizeDimensionId(String(input?.id ?? `dimension_${index + 1}`));
   const name = String(input?.name ?? input?.label ?? id);
   const maxScore = Number(input?.max_score ?? 5);
   const description = String(input?.description ?? input?.guidance ?? "").trim();

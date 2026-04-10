@@ -7,5 +7,5 @@
     "./corina-pipeline.json"
   ],
   "tiers": [1, 2],
-  "judgeAgent": "corina-critic"
+  "judgeAgent": "critic"
 }

@@ -45,7 +45,7 @@ const sampleCritique: CritiqueReport = {
   pass_threshold: 20,
   dimensions: {
     ai_patterns: { score: 2, issues: ["Too many AI clichés"], strengths: [] },
-    corina_tone: { score: 3, issues: ["Too polished"], strengths: [] },
+    tone: { score: 3, issues: ["Too polished"], strengths: [] },
     precision: { score: 2, issues: ["Claims are vague"], strengths: [] },
     evidence: { score: 2, issues: ["Missing support"], strengths: [] },
     rhythm: { score: 3, issues: ["Sentence lengths feel uniform"], strengths: [] },

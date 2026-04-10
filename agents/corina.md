@@ -6,5 +6,12 @@ permission:
   edit: allow
   bash: deny
   webfetch: ask
+  task:
+    "*": deny
+    "critic": allow
+    "auditor": allow
+    "detector": allow
+    "tone-writer": allow
+    "tone-validator": allow
 prompt: ../prompts/base/corina-persona.md
 ---

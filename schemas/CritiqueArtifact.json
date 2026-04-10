@@ -8,7 +8,7 @@
     "overall_score": { "type": "number", "minimum": 0, "maximum": 25 },
     "dimensions": {
       "type": "object",
-      "required": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"],
+      "required": ["ai_patterns", "tone", "precision", "evidence", "rhythm"],
       "properties": {
         "ai_patterns": {
           "type": "object",
@@ -18,7 +18,7 @@
             "issues": { "type": "array", "items": { "type": "string" } }
           }
         },
-        "corina_tone": {
+        "tone": {
           "type": "object",
           "required": ["score", "issues"],
           "properties": {

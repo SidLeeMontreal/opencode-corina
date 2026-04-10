@@ -13,7 +13,7 @@ const critique: CritiqueReport = {
   pass_threshold: 20,
   dimensions: {
     ai_patterns: { score: 3, issues: ["AI-ish opener"], strengths: [] },
-    corina_tone: { score: 4, issues: [], strengths: ["Grounded tone"] },
+    tone: { score: 4, issues: [], strengths: ["Grounded tone"] },
     precision: { score: 4, issues: [], strengths: ["Clear verbs"] },
     evidence: { score: 3, issues: ["Unsupported claim"], strengths: [] },
     rhythm: { score: 4, issues: [], strengths: ["Varied cadence"] },

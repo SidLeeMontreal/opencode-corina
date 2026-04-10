@@ -11,7 +11,7 @@ function makeReport(scoreByDimension: [number, number, number, number, number], 
     pass_threshold: 20,
     dimensions: {
       ai_patterns: { score: ai, issues: [], strengths: [`${label} ai`] },
-      corina_tone: { score: tone, issues: [], strengths: [`${label} tone`] },
+      tone: { score: tone, issues: [], strengths: [`${label} tone`] },
       precision: { score: precision, issues: [], strengths: [`${label} precision`] },
       evidence: { score: evidence, issues: [], strengths: [`${label} evidence`] },
       rhythm: { score: rhythm, issues: [], strengths: [`${label} rhythm`] },

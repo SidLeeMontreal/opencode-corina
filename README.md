@@ -50,12 +50,12 @@ Dependencies for local use are declared in `.opencode/package.json` and installe
 
 ### Tool usage
 
-The plugin registers custom tools including `corina_write`.
+The plugin registers custom tools including `write`.
 
 Example call shape:
 
 ```ts
-await ctx.callTool("corina_write", {
+await ctx.callTool("write", {
   brief: "Write a sharp article for CTOs on why AI governance fails when it is owned only by legal."
 });
 ```

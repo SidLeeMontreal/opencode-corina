@@ -33,7 +33,7 @@ describe("Critique E2E", { timeout: 600_000 }, () => {
 
       expect(dims.ai_patterns.score).toBeGreaterThanOrEqual(1)
       expect(dims.ai_patterns.score).toBeLessThanOrEqual(5)
-      expect(dims.corina_tone.score).toBeDefined()
+      expect(dims.tone.score).toBeDefined()
       expect(dims.precision.score).toBeDefined()
     })
   })

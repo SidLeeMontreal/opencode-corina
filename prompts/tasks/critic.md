@@ -30,7 +30,7 @@ Return valid JSON matching this schema exactly:
       "score": number,
       "issues": ["string"]
     },
-    "corina_tone": {
+    "tone": {
       "score": number,
       "issues": ["string"]
     },
