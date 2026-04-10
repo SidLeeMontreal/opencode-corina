@@ -270,6 +270,136 @@ export interface WorkflowState {
   warnings: string[];
 }
 
+export type CritiqueMode = "quality" | "audience" | "rubric" | "compare";
+export type CritiqueRenderFormat = "inline" | "report" | "json";
+export type CritiqueChain = "tone" | "pipeline" | "detect";
+export type CritiqueStatus = "ok" | "no_input" | "degraded";
+export type CritiqueDimensionKey = "ai_patterns" | "corina_tone" | "precision" | "evidence" | "rhythm";
+export type AudienceNeedGapType = "clarity" | "evidence" | "relevance" | "trust" | "terminology";
+
+export interface CritiqueDimensionDetail {
+  score: number;
+  issues: string[];
+  strengths: string[];
+  evidence?: string[];
+}
+
+export interface CritiqueIssue {
+  id: string;
+  dimension: CritiqueDimensionKey;
+  severity: "high" | "medium" | "low";
+  summary: string;
+  fix_direction: string;
+}
+
+export interface CritiqueReport {
+  status: CritiqueStatus;
+  pass: boolean;
+  overall_score: number;
+  pass_threshold: number;
+  dimensions: Record<CritiqueDimensionKey, CritiqueDimensionDetail>;
+  issues: CritiqueIssue[];
+  strengths: string[];
+  revision_instructions: string[];
+  fatal_issues: string[];
+  assumptions: string[];
+}
+
+export interface AudienceNeedGap {
+  type: AudienceNeedGapType;
+  summary: string;
+  fix_direction: string;
+}
+
+export interface AudienceCritiqueReport {
+  status: CritiqueStatus;
+  audience_requested: string | null;
+  audience_applied: string;
+  audience_inferred: boolean;
+  resonance_score: number;
+  what_lands: string[];
+  what_misses: string[];
+  unclear_points: string[];
+  missing_for_audience: string[];
+  jargon_risks: string[];
+  need_gaps: AudienceNeedGap[];
+  rewrite_brief: string[];
+  assumptions: string[];
+}
+
+export interface RubricDimension {
+  id: string;
+  name: string;
+  max_score: number;
+  description: string;
+}
+
+export interface ResolvedRubric {
+  id: string;
+  name: string;
+  version: string;
+  dimensions: RubricDimension[];
+  raw_markdown: string;
+  source_path: string;
+}
+
+export interface RubricDimensionResult {
+  id: string;
+  label: string;
+  score: number;
+  max_score: number;
+  rationale: string;
+  strengths: string[];
+  weaknesses: string[];
+  fix_directions: string[];
+}
+
+export interface RubricReport {
+  status: CritiqueStatus;
+  rubric_id: string;
+  rubric_name: string;
+  voice_profile_hint?: string | null;
+  total_score: number;
+  max_total_score: number;
+  dimensions: RubricDimensionResult[];
+  strongest_dimensions: string[];
+  weakest_dimensions: string[];
+  overall_assessment: string;
+  assumptions: string[];
+}
+
+export interface ComparisonDelta {
+  compared_to: string;
+  score_delta: number;
+  dimension_deltas: Record<CritiqueDimensionKey, number>;
+  summary: string[];
+}
+
+export interface RankedVersion {
+  rank: number;
+  item_id: string;
+  label: string;
+  critique: CritiqueReport;
+  strengths_summary: string[];
+  weaknesses_summary: string[];
+  deltas_vs_next?: ComparisonDelta | null;
+}
+
+export interface ComparisonReport {
+  status: CritiqueStatus;
+  compared_count: number;
+  ranking: RankedVersion[];
+  recommended_item_id: string | null;
+  recommended_label: string | null;
+  recommendation_reason: string;
+  winner_text: string | null;
+  cross_version_patterns: string[];
+  assumptions: string[];
+  skipped_inputs: string[];
+}
+
+export type CritiqueArtifactUnion = CritiqueReport | AudienceCritiqueReport | RubricReport | ComparisonReport;
+
 export interface StepResult<T> {
   artifact: T;
   warnings?: string[];

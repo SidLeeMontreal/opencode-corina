@@ -3,6 +3,7 @@ import { tool } from "@opencode-ai/plugin";
 import type { StepModelConfig } from "opencode-model-resolver";
 
 import { writeAuditLog } from "./audit-log.js";
+import { runCritique } from "./critique.js";
 import { runDetectWithArtifact } from "./detect.js";
 import { runPipelineWithArtifact } from "./pipeline.js";
 import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
@@ -113,6 +114,44 @@ export const CorinaPlugin: Plugin = async (input) => {
               format,
               autoFix,
               voice,
+              modelPreset,
+              outputLength: renderedOutput.length,
+            },
+          });
+          return renderedOutput;
+        },
+      }),
+      corina_critique: tool({
+        description:
+          "Critique text quality (quality), evaluate for a specific audience (audience), score against a rubric (rubric), or rank N versions (compare). All modes return typed artifacts. All params optional — Corina infers missing ones.",
+        args: {
+          texts: tool.schema.array(tool.schema.string()),
+          mode: tool.schema.string().optional(),
+          audience: tool.schema.string().optional(),
+          rubric: tool.schema.string().optional(),
+          chain: tool.schema.string().optional(),
+          format: tool.schema.string().optional(),
+          modelPreset: tool.schema.string().optional(),
+        },
+        async execute({ texts, mode, audience, rubric, chain, format, modelPreset }, toolCtx) {
+          const renderedOutput = await runCritique(
+            texts,
+            { mode: mode as any, audience, rubric, chain: chain as any, format: format as any, modelPreset },
+            input.client,
+          );
+          writeAuditLog({
+            timestamp: new Date().toISOString(),
+            event: "corina_critique",
+            sessionId: toolCtx.sessionID,
+            briefPreview: texts.join(" | ").slice(0, 160),
+            outcome: "completed",
+            metadata: {
+              count: texts.length,
+              mode,
+              audience,
+              rubric,
+              chain,
+              format,
               modelPreset,
               outputLength: renderedOutput.length,
             },

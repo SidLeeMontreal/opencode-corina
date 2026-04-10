@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ComparisonReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "compared_count",
+    "ranking",
+    "recommended_item_id",
+    "recommended_label",
+    "recommendation_reason",
+    "winner_text",
+    "cross_version_patterns",
+    "assumptions",
+    "skipped_inputs"
+  ],
+  "properties": {
+    "status": { "type": "string", "enum": ["ok", "no_input", "degraded"] },
+    "compared_count": { "type": "integer", "minimum": 0 },
+    "ranking": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rank", "item_id", "label", "critique", "strengths_summary", "weaknesses_summary"],
+        "properties": {
+          "rank": { "type": "integer", "minimum": 1 },
+          "item_id": { "type": "string" },
+          "label": { "type": "string" },
+          "critique": { "$ref": "#/definitions/critiqueReport" },
+          "strengths_summary": { "type": "array", "items": { "type": "string" } },
+          "weaknesses_summary": { "type": "array", "items": { "type": "string" } },
+          "deltas_vs_next": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["compared_to", "score_delta", "dimension_deltas", "summary"],
+            "properties": {
+              "compared_to": { "type": "string" },
+              "score_delta": { "type": "number" },
+              "dimension_deltas": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"],
+                "properties": {
+                  "ai_patterns": { "type": "number" },
+                  "corina_tone": { "type": "number" },
+                  "precision": { "type": "number" },
+                  "evidence": { "type": "number" },
+                  "rhythm": { "type": "number" }
+                }
+              },
+              "summary": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "recommended_item_id": { "type": ["string", "null"] },
+    "recommended_label": { "type": ["string", "null"] },
+    "recommendation_reason": { "type": "string" },
+    "winner_text": { "type": ["string", "null"] },
+    "cross_version_patterns": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "skipped_inputs": { "type": "array", "items": { "type": "string" } }
+  },
+  "definitions": {
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "issues", "strengths"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "issues": { "type": "array", "items": { "type": "string" } },
+        "strengths": { "type": "array", "items": { "type": "string" } },
+        "evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "dimension", "severity", "summary", "fix_direction"],
+      "properties": {
+        "id": { "type": "string" },
+        "dimension": { "type": "string", "enum": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"] },
+        "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+        "summary": { "type": "string" },
+        "fix_direction": { "type": "string" }
+      }
+    },
+    "critiqueReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "pass",
+        "overall_score",
+        "pass_threshold",
+        "dimensions",
+        "issues",
+        "strengths",
+        "revision_instructions",
+        "fatal_issues",
+        "assumptions"
+      ],
+      "properties": {
+        "status": { "type": "string", "enum": ["ok", "no_input", "degraded"] },
+        "pass": { "type": "boolean" },
+        "overall_score": { "type": "number", "minimum": 0, "maximum": 25 },
+        "pass_threshold": { "type": "number", "const": 20 },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"],
+          "properties": {
+            "ai_patterns": { "$ref": "#/definitions/dimension" },
+            "corina_tone": { "$ref": "#/definitions/dimension" },
+            "precision": { "$ref": "#/definitions/dimension" },
+            "evidence": { "$ref": "#/definitions/dimension" },
+            "rhythm": { "$ref": "#/definitions/dimension" }
+          }
+        },
+        "issues": { "type": "array", "items": { "$ref": "#/definitions/issue" } },
+        "strengths": { "type": "array", "items": { "type": "string" } },
+        "revision_instructions": { "type": "array", "items": { "type": "string" } },
+        "fatal_issues": { "type": "array", "items": { "type": "string" } },
+        "assumptions": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

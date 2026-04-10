@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CritiqueReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "pass",
+    "overall_score",
+    "pass_threshold",
+    "dimensions",
+    "issues",
+    "strengths",
+    "revision_instructions",
+    "fatal_issues",
+    "assumptions"
+  ],
+  "properties": {
+    "status": { "type": "string", "enum": ["ok", "no_input", "degraded"] },
+    "pass": { "type": "boolean" },
+    "overall_score": { "type": "number", "minimum": 0, "maximum": 25 },
+    "pass_threshold": { "type": "number", "const": 20 },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"],
+      "properties": {
+        "ai_patterns": { "$ref": "#/definitions/dimension" },
+        "corina_tone": { "$ref": "#/definitions/dimension" },
+        "precision": { "$ref": "#/definitions/dimension" },
+        "evidence": { "$ref": "#/definitions/dimension" },
+        "rhythm": { "$ref": "#/definitions/dimension" }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/issue" }
+    },
+    "strengths": { "type": "array", "items": { "type": "string" } },
+    "revision_instructions": { "type": "array", "items": { "type": "string" } },
+    "fatal_issues": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } }
+  },
+  "definitions": {
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "issues", "strengths"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "issues": { "type": "array", "items": { "type": "string" } },
+        "strengths": { "type": "array", "items": { "type": "string" } },
+        "evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "dimension", "severity", "summary", "fix_direction"],
+      "properties": {
+        "id": { "type": "string" },
+        "dimension": {
+          "type": "string",
+          "enum": ["ai_patterns", "corina_tone", "precision", "evidence", "rhythm"]
+        },
+        "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+        "summary": { "type": "string" },
+        "fix_direction": { "type": "string" }
+      }
+    }
+  }
+}

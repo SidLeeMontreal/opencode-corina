@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AudienceCritiqueReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "audience_requested",
+    "audience_applied",
+    "audience_inferred",
+    "resonance_score",
+    "what_lands",
+    "what_misses",
+    "unclear_points",
+    "missing_for_audience",
+    "jargon_risks",
+    "need_gaps",
+    "rewrite_brief",
+    "assumptions"
+  ],
+  "properties": {
+    "status": { "type": "string", "enum": ["ok", "no_input", "degraded"] },
+    "audience_requested": { "type": ["string", "null"] },
+    "audience_applied": { "type": "string" },
+    "audience_inferred": { "type": "boolean" },
+    "resonance_score": { "type": "number", "minimum": 0, "maximum": 5 },
+    "what_lands": { "type": "array", "items": { "type": "string" } },
+    "what_misses": { "type": "array", "items": { "type": "string" } },
+    "unclear_points": { "type": "array", "items": { "type": "string" } },
+    "missing_for_audience": { "type": "array", "items": { "type": "string" } },
+    "jargon_risks": { "type": "array", "items": { "type": "string" } },
+    "need_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "summary", "fix_direction"],
+        "properties": {
+          "type": { "type": "string", "enum": ["clarity", "evidence", "relevance", "trust", "terminology"] },
+          "summary": { "type": "string" },
+          "fix_direction": { "type": "string" }
+        }
+      }
+    },
+    "rewrite_brief": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } }
+  }
+}
