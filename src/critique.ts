@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ModelResolver } from "opencode-model-resolver";
 import type { ResolvedModel } from "opencode-model-resolver";
+import { detectAiPatterns } from "opencode-text-tools";
 
 import { createCapabilityOutput } from "./capability-output.js";
+import { loadPrompt } from "./prompt-loader.js";
 import { aggregateComparison } from "./critique-compare.js";
 import {
   formatAudienceInline,
@@ -38,9 +39,7 @@ import type {
 } from "./types.js";
 import { validate } from "./validators.js";
 
-const PROMPTS_DIR = join(homedir(), ".config", "opencode", "prompts");
 const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas");
-const promptCache = new Map<string, string>();
 const schemaCache = new Map<string, Record<string, unknown>>();
 const modelResolver = new ModelResolver();
 const TONE_VOICES = new Set<ToneVoice>([
@@ -66,14 +65,6 @@ export interface RunCritiqueOptions {
   modelPreset?: string;
   voice?: string;
   __chainSourceText?: string;
-}
-
-function loadPrompt(filename: string): string {
-  const cached = promptCache.get(filename);
-  if (cached) return cached;
-  const content = readFileSync(join(PROMPTS_DIR, filename), "utf8").trim();
-  promptCache.set(filename, content);
-  return content;
 }
 
 function loadSchema(filename: string): Record<string, unknown> {
@@ -260,6 +251,122 @@ function buildEmptyRubricReport(rubric: ResolvedRubric | undefined, assumptions:
 
 function buildInputSummary(count: number, mode: CritiqueMode): string {
   return `Critiqued ${count} input${count === 1 ? "" : "s"} in ${mode} mode.`;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function buildFallbackQualityReport(text: string, assumptions: string[], error: unknown): CritiqueReport {
+  const scan = detectAiPatterns(text);
+  const findings = scan.patternMatches.slice(0, 5);
+  const derivedIssues = findings.map((match, index) => ({
+    id: `fallback_${index + 1}`,
+    dimension: (match.category === "language" || match.category === "filler"
+      ? "ai_patterns"
+      : match.category === "style"
+        ? "rhythm"
+        : match.category === "communication"
+          ? "corina_tone"
+          : "precision") as CritiqueReport["issues"][number]["dimension"],
+    severity: match.severity,
+    summary: `${match.explanation} (${match.locationHint})`,
+    fix_direction: match.fixSuggestion,
+  }));
+
+  const issues = derivedIssues.length
+    ? derivedIssues
+    : [
+        {
+          id: "fallback_generic",
+          dimension: "precision" as const,
+          severity: "medium" as const,
+          summary: "Live critique was unavailable, so this report used local heuristic checks.",
+          fix_direction: "Tighten specificity, remove generic phrasing, and rerun critique when the server is available.",
+        },
+      ];
+
+  const aiScore = scan.counts.totalMatches >= 6 ? 1 : scan.counts.totalMatches >= 3 ? 2 : scan.counts.totalMatches >= 1 ? 3 : 4;
+  const toneScore = /(innovative|transformative|seamless|unlock|elevate)/i.test(text) ? 2 : 3;
+  const precisionScore = /(many|various|numerous|several|robust|powerful)/i.test(text) ? 2 : 3;
+  const evidenceScore = /(according to|study|data|survey|report|research|%|percent|202\d)/i.test(text) ? 3 : 2;
+  const rhythmScore = /(additionally|furthermore|moreover)/i.test(text) ? 2 : 3;
+  const overallScore = aiScore + toneScore + precisionScore + evidenceScore + rhythmScore;
+
+  return {
+    status: "degraded",
+    pass: false,
+    overall_score: overallScore,
+    pass_threshold: 20,
+    dimensions: {
+      ai_patterns: {
+        score: aiScore,
+        issues: issues.filter((issue) => issue.dimension === "ai_patterns").map((issue) => issue.summary),
+        strengths: scan.counts.totalMatches === 0 ? ["Local scan found few explicit AI-pattern signals."] : [],
+      },
+      corina_tone: {
+        score: toneScore,
+        issues: issues.filter((issue) => issue.dimension === "corina_tone").map((issue) => issue.summary),
+        strengths: [],
+      },
+      precision: {
+        score: precisionScore,
+        issues: issues.filter((issue) => issue.dimension === "precision").map((issue) => issue.summary),
+        strengths: [],
+      },
+      evidence: {
+        score: evidenceScore,
+        issues: evidenceScore < 3 ? ["The text makes broad claims without enough concrete support."] : [],
+        strengths: evidenceScore >= 3 ? ["The text includes at least some concrete evidence markers."] : [],
+      },
+      rhythm: {
+        score: rhythmScore,
+        issues: issues.filter((issue) => issue.dimension === "rhythm").map((issue) => issue.summary),
+        strengths: [],
+      },
+    },
+    issues,
+    strengths: ["Fallback heuristic critique used because the live critique call failed."],
+    revision_instructions: [...new Set(issues.map((issue) => issue.fix_direction))],
+    fatal_issues: [`Quality critique degraded: ${errorMessage(error)}`],
+    assumptions,
+  };
+}
+
+function buildFallbackRubricReport(rubric: ResolvedRubric | undefined, assumptions: string[], error: unknown, text: string): RubricReport {
+  const scan = detectAiPatterns(text);
+  const baseDimensions = rubric?.dimensions ?? [];
+  const dimensions = baseDimensions.map((dimension, index) => {
+    const penalty = Math.min(Math.max(scan.counts.totalMatches, 1), Math.max(dimension.max_score - 1, 1));
+    const score = Math.max(1, dimension.max_score - penalty + (index === 0 ? 0 : 1));
+    return {
+      id: dimension.id,
+      label: dimension.name,
+      score,
+      max_score: dimension.max_score,
+      rationale: `Fallback rubric scoring used because the live rubric critic was unavailable (${errorMessage(error)}).`,
+      strengths: score >= Math.ceil(dimension.max_score / 2) ? ["Text partially satisfies this dimension under heuristic scoring."] : [],
+      weaknesses: [dimension.description || "Needs stronger execution for this rubric dimension."],
+      fix_directions: scan.patternMatches.slice(0, 2).map((match) => match.fixSuggestion),
+    };
+  });
+
+  const total_score = dimensions.reduce((sum, dimension) => sum + dimension.score, 0);
+  const sorted = [...dimensions].sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
+
+  return {
+    status: "degraded",
+    rubric_id: rubric?.id ?? "corina",
+    rubric_name: rubric?.name ?? "Corina Editorial Standard",
+    voice_profile_hint: null,
+    total_score,
+    max_total_score: dimensions.reduce((sum, dimension) => sum + dimension.max_score, 0),
+    dimensions,
+    strongest_dimensions: sorted.slice(0, 2).map((dimension) => dimension.label),
+    weakest_dimensions: [...sorted].reverse().slice(0, 2).map((dimension) => dimension.label),
+    overall_assessment: `Fallback rubric scoring used because the live rubric critic was unavailable (${errorMessage(error)}).`,
+    assumptions: [...assumptions, `Rubric critique degraded: ${errorMessage(error)}`],
+  };
 }
 
 function buildQualityPrompt(input: {
@@ -573,7 +680,7 @@ async function runQualityMode(text: string, sourcePath: string | null, toneOutpu
     client,
     title: "Corina critique",
     agent: "corina-critic",
-    personaFile: "corina-critic.txt",
+    personaFile: "tasks/critic.md",
     schemaFile: "CritiqueReport.json",
     taskPrompt: buildQualityPrompt({ text, sourcePath, toneOutput, detectionReport, assumptions }),
     model,
@@ -618,8 +725,7 @@ export async function runCritiqueWithArtifact(
     try {
       artifact = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model);
     } catch (error) {
-      artifact = buildEmptyCritiqueReport(`Quality critique degraded: ${error instanceof Error ? error.message : String(error)}`, assumptions);
-      artifact.status = "degraded";
+      artifact = buildFallbackQualityReport(item.text, assumptions, error);
     }
 
     const validation = validate("CritiqueReport", artifact);
@@ -646,7 +752,7 @@ export async function runCritiqueWithArtifact(
         client,
         title: "Corina audience critique",
         agent: "corina-audience-critic",
-        personaFile: "corina-audience-critic.txt",
+        personaFile: "tasks/audience-critic.md",
         schemaFile: "AudienceCritiqueReport.json",
         taskPrompt: buildAudiencePrompt({
           text: item.text,
@@ -692,7 +798,7 @@ export async function runCritiqueWithArtifact(
         client,
         title: "Corina rubric critique",
         agent: "corina-rubric-critic",
-        personaFile: "corina-rubric-critic.txt",
+        personaFile: "tasks/rubric-critic.md",
         schemaFile: "RubricReport.json",
         taskPrompt: buildRubricPrompt({
           text: item.text,
@@ -706,11 +812,7 @@ export async function runCritiqueWithArtifact(
       });
       artifact.assumptions = [...(artifact.assumptions ?? []), ...assumptions];
     } catch (error) {
-      artifact = buildEmptyRubricReport(normalized.resolvedRubric, [
-        ...assumptions,
-        `Rubric critique degraded: ${error instanceof Error ? error.message : String(error)}`,
-      ]);
-      artifact.status = "degraded";
+      artifact = buildFallbackRubricReport(normalized.resolvedRubric, assumptions, error, item.text);
     }
 
     const validation = validate("RubricReport", artifact);
@@ -742,8 +844,10 @@ export async function runCritiqueWithArtifact(
     try {
       const report = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model);
       reports.push({ label: item.label, score: report.overall_score, report, itemId: item.id, text: item.text });
-    } catch {
-      skippedInputs.push(item.label);
+    } catch (error) {
+      const report = buildFallbackQualityReport(item.text, assumptions, error);
+      reports.push({ label: item.label, score: report.overall_score, report, itemId: item.id, text: item.text });
+      skippedInputs.push(`${item.label} (live critique unavailable; used fallback)`);
     }
   }
 

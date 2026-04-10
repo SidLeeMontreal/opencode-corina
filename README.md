@@ -126,3 +126,39 @@ npm run eval:baseline  # live Tier 2 run and save baseline
 - Baselines default to `evals/baselines/{suite-name}.json`
 - Saved reports land in `evals/reports/`
 - PR CI runs Tier 1 only via `.github/workflows/eval-tier1.yml`
+
+## Editing prompts
+
+All Corina prompts now live in `prompts/` and are versioned with the package.
+
+### Bundled prompts
+- Base prompt: `prompts/base/`
+- Task prompts: `prompts/tasks/`
+- Voice prompts: `prompts/voices/`
+
+Edit those files directly, then restart your OpenCode server from the repo root so project-local agents resolve the updated prompt paths correctly.
+
+### Local overrides
+To override a prompt without committing it, create a matching file under `.corina-local/prompts/`.
+
+Example:
+- `.corina-local/prompts/tasks/critic.md` overrides `prompts/tasks/critic.md`
+- `.corina-local/prompts/voices/journalist.md` overrides `prompts/voices/journalist.md`
+
+TypeScript prompt loaders check `.corina-local/prompts/` first, then fall back to the bundled prompt under `prompts/`.
+
+### Installing project agents
+Run:
+
+```bash
+npm run install-corina
+```
+
+This generates `.opencode/agents/` with prompt paths that resolve relative to the repo root.
+
+### When to bump the version
+See `CHANGELOG-prompts.md`. In short:
+- patch: no intended behavior change
+- minor: prompt tuning or new prompt assets
+- major: persona, rubric, or output-contract changes
+

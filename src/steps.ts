@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { ResolvedModel } from "opencode-model-resolver"
 import { detectBannedWords, wordCount } from "opencode-text-tools"
 
+import { loadPrompt } from "./prompt-loader.js"
 import type {
   AuditArtifact,
   BriefArtifact,
@@ -16,10 +16,8 @@ import type {
   StepResult,
 } from "./types.js"
 
-const PROMPTS_DIR = join(homedir(), ".config", "opencode", "prompts")
 const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas")
 
-const promptCache = new Map<string, string>()
 const schemaCache = new Map<string, Record<string, unknown>>()
 
 export function sanitizeWords(text: string): string[] {
@@ -28,17 +26,6 @@ export function sanitizeWords(text: string): string[] {
 
 export function countWords(text: string): number {
   return wordCount(text).total_words
-}
-
-function loadPrompt(filename: string): string {
-  const cached = promptCache.get(filename)
-  if (cached) {
-    return cached
-  }
-
-  const content = readFileSync(join(PROMPTS_DIR, filename), "utf8").trim()
-  promptCache.set(filename, content)
-  return content
 }
 
 function loadSchema(filename: string): Record<string, unknown> {
@@ -229,7 +216,7 @@ export async function runBriefIntake(
     client,
     title: "Corina brief intake",
     agent: "corina",
-    personaFile: "corina-persona.txt",
+    personaFile: "base/corina-persona.md",
     schemaFile: "BriefArtifact.json",
     model,
     taskPrompt: [
@@ -255,7 +242,7 @@ export async function runOutline(
     client,
     title: "Corina outline",
     agent: "corina",
-    personaFile: "corina-persona.txt",
+    personaFile: "base/corina-persona.md",
     schemaFile: "OutlineArtifact.json",
     model,
     taskPrompt: [
@@ -281,7 +268,7 @@ export async function runDraft(
     client,
     title: "Corina draft",
     agent: "corina",
-    personaFile: "corina-persona.txt",
+    personaFile: "base/corina-persona.md",
     model,
     taskPrompt: [
       "Write the full draft using the brief and outline below.",
@@ -321,7 +308,7 @@ export async function runCritique(
     client,
     title: "Corina critique",
     agent: "corina-critic",
-    personaFile: "corina-critic.txt",
+    personaFile: "tasks/critic.md",
     schemaFile: "CritiqueArtifact.json",
     model,
     taskPrompt: [
@@ -350,7 +337,7 @@ export async function runRevise(
     client,
     title: "Corina revise",
     agent: "corina",
-    personaFile: "corina-persona.txt",
+    personaFile: "base/corina-persona.md",
     model,
     taskPrompt: [
       "Revise the draft using the critique below.",
@@ -385,7 +372,7 @@ export async function runAudit(
     client,
     title: "Corina audit",
     agent: "corina-auditor",
-    personaFile: "corina-auditor.txt",
+    personaFile: "tasks/auditor.md",
     schemaFile: "AuditArtifact.json",
     model,
     taskPrompt: [

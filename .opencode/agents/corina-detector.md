@@ -6,5 +6,5 @@ permission:
   edit: deny
   bash: deny
   webfetch: deny
-prompt: ../prompts/tasks/detector.md
+prompt: ../../prompts/tasks/detector.md
 ---

@@ -1,9 +1,10 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createCapabilityOutput } from "./capability-output.js";
+import { loadPrompt, promptExists, PROMPTS_DIR } from "./prompt-loader.js";
 import type {
   AgentCapabilityOutput,
   BrandProfile,
@@ -19,7 +20,6 @@ import type {
 import { buildPersonalVoiceProfile, inferFormat, inferVoice, resolveVoiceProfile } from "./tone-defaults.js";
 import { validate } from "./validators.js";
 
-const PROMPTS_DIR = join(homedir(), ".config", "opencode", "prompts");
 const VOICES_DIR = join(PROMPTS_DIR, "voices");
 const PROFILES_DIR = join(homedir(), ".config", "opencode", "corina", "profiles");
 const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas");
@@ -118,11 +118,6 @@ async function deleteSession(client: OpenCodeClient, sessionId: string): Promise
 
     await sessionClient.delete({ path: { sessionID: sessionId } });
   }
-}
-
-function loadPrompt(pathOrName: string): string {
-  const fullPath = isAbsolute(pathOrName) ? pathOrName : join(PROMPTS_DIR, pathOrName);
-  return readFileSync(fullPath, "utf8").trim();
 }
 
 function cleanText(text: string): string {
@@ -368,7 +363,7 @@ async function runWriter(
     await promptSession(client, session.id, {
       agent: "corina-tone-writer",
       noReply: true,
-      parts: [{ type: "text", text: loadPrompt("corina-tone-writer.txt") }],
+      parts: [{ type: "text", text: loadPrompt("tasks/tone-writer.md") }],
     });
 
     const result = await promptSession(client, session.id, {
@@ -408,7 +403,7 @@ async function runValidator(
     await promptSession(client, session.id, {
       agent: "corina-tone-validator",
       noReply: true,
-      parts: [{ type: "text", text: loadPrompt("corina-tone-validator.txt") }],
+      parts: [{ type: "text", text: loadPrompt("tasks/tone-validator.md") }],
     });
 
     const result = await promptSession(client, session.id, {
@@ -589,9 +584,9 @@ export async function runTonePipelineWithArtifact(
     assumptions.push(`ToneInputArtifact validation warning: ${inputValidation.errors.join("; ")}`);
   }
 
-  const voiceProfilePath = join(VOICES_DIR, `${voice}.txt`);
-  const voiceProfile = existsSync(voiceProfilePath)
-    ? loadPrompt(voiceProfilePath)
+  const voiceProfileRelativePath = `voices/${voice}.md`;
+  const voiceProfile = promptExists(voiceProfileRelativePath)
+    ? loadPrompt(voiceProfileRelativePath)
     : `Voice profile missing for ${voice}. Preserve facts. Produce usable output.`;
 
   const firstPassInstructions = input.fixInstructions?.length ? input.fixInstructions : undefined;

@@ -1,13 +1,11 @@
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Layer1Scan } from "opencode-text-tools";
 
+import { loadPrompt } from "./prompt-loader.js";
 import type { Layer2Analysis, OpenCodeClient, PatternFinding } from "./types.js";
-
-const PROMPTS_DIR = join(homedir(), ".config", "opencode", "prompts");
 const SCHEMAS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "schemas");
 const FALLBACK_PROMPT = `You are an independent AI-writing pattern analyst. Your role is forensic and diagnostic — you do not rewrite, you do not judge quality, and you do not claim authorship with certainty.
 
@@ -86,9 +84,12 @@ async function deleteSession(client: OpenCodeClient, sessionId: string): Promise
   }
 }
 
-function loadPrompt(): string {
-  const candidate = join(PROMPTS_DIR, "corina-detector.txt");
-  return existsSync(candidate) ? readFileSync(candidate, "utf8").trim() : FALLBACK_PROMPT;
+function loadDetectorPrompt(): string {
+  try {
+    return loadPrompt("tasks/detector.md");
+  } catch {
+    return FALLBACK_PROMPT;
+  }
 }
 
 function fallbackLayer2(layer1Scan: Layer1Scan, findings: PatternFinding[], error?: unknown): Layer2Analysis {
@@ -123,7 +124,7 @@ export async function runLayer2Analysis(
     await promptSession(client, session.id, {
       agent: "corina-detector",
       noReply: true,
-      parts: [{ type: "text", text: loadPrompt() }],
+      parts: [{ type: "text", text: loadDetectorPrompt() }],
     });
 
     const result = await promptSession(client, session.id, {

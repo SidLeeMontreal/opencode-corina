@@ -6,5 +6,5 @@ permission:
   edit: allow
   bash: deny
   webfetch: ask
-prompt: ../prompts/base/corina-persona.md
+prompt: ../../prompts/base/corina-persona.md
 ---
