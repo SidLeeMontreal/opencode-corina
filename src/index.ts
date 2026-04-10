@@ -10,6 +10,7 @@ import { runPipelineWithArtifact } from "./pipeline.js";
 import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
 import type { AgentCapabilityOutput, AuditLogEntry, PipelineModelConfig } from "./types.js";
 
+// Helpers
 function buildUniformModelConfig(modelPreset?: "fast" | "balanced" | "quality"): Partial<PipelineModelConfig> | undefined {
   if (!modelPreset) {
     return undefined;
@@ -47,8 +48,8 @@ function writeCapabilityAudit(entry: Omit<AuditLogEntry, "timestamp" | "event">)
   });
 }
 
-export const CorinaPlugin: Plugin = async (input) => {
-  const logger = makeOpenCodeLogger(input.client, "corina");
+export const CorinaPlugin: Plugin = async ({ client }) => {
+  const logger = makeOpenCodeLogger(client, "corina");
 
   return {
     tool: {
@@ -64,7 +65,7 @@ export const CorinaPlugin: Plugin = async (input) => {
           format: tool.schema.string().optional().describe("Optional output format. Use json for the universal envelope."),
         },
         execute: async ({ brief, modelPreset, format }, toolCtx) => {
-          const output = await runPipelineWithArtifact(brief, input.client, buildUniformModelConfig(modelPreset), logger);
+          const output = await runPipelineWithArtifact(brief, client, buildUniformModelConfig(modelPreset), logger);
           const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
           const metrics = outputMetrics(output);
           writeCapabilityAudit({
@@ -96,7 +97,7 @@ export const CorinaPlugin: Plugin = async (input) => {
         execute: async (args, toolCtx) => {
           const wantsJson = args.format === "json";
           const toneArgs = wantsJson ? { ...args, format: undefined } : args;
-          const output = await runTonePipelineWithArtifact(toneArgs, input.client, logger);
+          const output = await runTonePipelineWithArtifact(toneArgs, client, logger);
           const renderedOutput = wantsJson ? JSON.stringify(output, null, 2) : output.rendered;
           const metrics = outputMetrics(output);
           writeCapabilityAudit({
@@ -124,7 +125,7 @@ export const CorinaPlugin: Plugin = async (input) => {
           modelPreset: tool.schema.string().optional(),
         },
         execute: async ({ text, format, autoFix, chain, voice, modelPreset }, toolCtx) => {
-          const output = await runDetectWithArtifact({ text, format: format as any, autoFix, chain: chain as any, voice, modelPreset }, input.client, logger);
+          const output = await runDetectWithArtifact({ text, format: format as any, autoFix, chain: chain as any, voice, modelPreset }, client, logger);
           const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
           const metrics = outputMetrics(output);
           writeCapabilityAudit({
@@ -171,7 +172,7 @@ export const CorinaPlugin: Plugin = async (input) => {
           const output = await runCritiqueWithArtifact(
             texts,
             { mode: mode as any, audience, rubric, chain: chain as any, format: format as any, modelPreset, voice },
-            input.client,
+            client,
             logger,
           );
           const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
@@ -204,6 +205,9 @@ export const CorinaPlugin: Plugin = async (input) => {
           return renderedOutput;
         },
       }),
+    },
+    "server.connected": async () => {
+      logger.info("plugin_loaded", { plugin: "opencode-corina", version: "0.1.0" });
     },
     event: async ({ event }) => {
       if (event.type !== "session.idle") {

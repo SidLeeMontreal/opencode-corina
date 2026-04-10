@@ -60,7 +60,7 @@ export function makeOpenCodeLogger(client: OpenCodeClient, service: string): Age
 }
 
 export function makeConsoleLogger(service: string): AgentLogger {
-  const debugEnabled = process.env.CORINA_DEBUG === "1" || process.env.NODE_ENV === "development";
+  const debugEnabled = process.env["CORINA_DEBUG"] === "1" || process.env["NODE_ENV"] === "development";
   const emit = (level: LogLevel, event: string, extra?: Record<string, unknown>) => {
     const payload = normalizeExtra(event, service, level, extra);
     const line = JSON.stringify(payload);

@@ -1,0 +1,9 @@
+{
+  "_comment": "Local plugin dependency file for OpenCode. The file: paths assume opencode-model-resolver and opencode-text-tools live as sibling repos under ~/dev/personal/.",
+  "dependencies": {
+    "@opencode-ai/plugin": "*",
+    "@opencode-ai/sdk": "*",
+    "opencode-model-resolver": "file:../../opencode-model-resolver",
+    "opencode-text-tools": "file:../../opencode-text-tools"
+  }
+}

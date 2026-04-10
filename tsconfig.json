@@ -6,6 +6,12 @@
     "rootDir": "src",
     "outDir": "dist",
     "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    // Deliberately excluded for now: both are useful, but would force broader type
+    // churn across current artifacts and helpers than this alignment pass intends.
+    // "noUncheckedIndexedAccess": true,
+    // "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "declaration": true,

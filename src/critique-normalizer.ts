@@ -71,8 +71,8 @@ function extractTextFromUnknownArtifact(value: unknown): { text: string; toneOut
   if (isDetectionReport(value)) {
     return {
       text:
-        typeof (value as unknown as Record<string, unknown>).source_text === "string"
-          ? String((value as unknown as Record<string, unknown>).source_text)
+        typeof (value as unknown as Record<string, unknown>)["source_text"] === "string"
+          ? String((value as unknown as Record<string, unknown>)["source_text"])
           : "",
       detectionReport: value,
     };
@@ -80,9 +80,9 @@ function extractTextFromUnknownArtifact(value: unknown): { text: string; toneOut
 
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
-    if (typeof record.text === "string") return { text: record.text };
-    if (typeof record.content === "string") return { text: record.content };
-    if (typeof record.final_content === "string") return { text: record.final_content };
+    if (typeof record["text"] === "string") return { text: record["text"] };
+    if (typeof record["content"] === "string") return { text: record["content"] };
+    if (typeof record["final_content"] === "string") return { text: record["final_content"] };
   }
 
   return { text: "" };

@@ -26,7 +26,31 @@ To use the built package in OpenCode, point your local OpenCode plugin configura
 
 ## Usage
 
-The plugin registers a custom tool named `corina_write`.
+### As an npm package (recommended for teams)
+
+Add to your `opencode.json`:
+
+```json
+{
+  "plugin": ["opencode-corina"]
+}
+```
+
+Then install:
+
+```bash
+npm install -g opencode-corina
+```
+
+### As a local project plugin (for development)
+
+Clone this repo and run OpenCode from the repo root. OpenCode will automatically load `.opencode/plugins/corina.ts`.
+
+Dependencies for local use are declared in `.opencode/package.json` and installed by OpenCode via Bun at startup. If sibling packages (`opencode-model-resolver`, `opencode-text-tools`) are not at `../`, update the `file:` paths accordingly.
+
+### Tool usage
+
+The plugin registers custom tools including `corina_write`.
 
 Example call shape:
 
