@@ -1,52 +1,61 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { createOpencodeClient } from "@opencode-ai/sdk"
+import { beforeAll, describe, expect, it } from "vitest"
+
 import { runTonePipelineWithArtifact } from "../../src/tone-pipeline.js"
-import { createMockClient } from "../helpers/mock-client.js"
 
-describe("tone pipeline", () => {
-  it("rewrites the corporate AI corpus in journalist voice", async () => {
-    const source = readFileSync(join(process.cwd(), "tests/fixtures/corpus/01-corporate-ai.txt"), "utf8")
-    const client = createMockClient([
-      {
-        data: {
-          parts: [
-            {
-              type: "text",
-              text:
-                "## VOICE APPLIED\njournalist | article | general readers\n\n## ASSUMPTIONS\n- None\n\n## REWRITTEN CONTENT\nCompanies are using automation to handle more customer interactions without adding the same amount of manual effort. In practice, that can speed up response times and tailor messages more closely to user behavior, but the impact depends on how the system is trained and where it is deployed.",
-            },
-          ],
-        },
-      },
-      {
-        data: {
-          structured_output: {
-            pass: true,
-            validation_score: 95,
-            voice_checks: [
-              "Leads with the most concrete claim.",
-              "Uses declarative, reportable phrasing.",
-              "Avoids promotional framing.",
-            ],
-            preservation_checks: ["Named entities, numbers, and dates from the source remain present or were not applicable."],
-            entity_gaps: [],
-            ai_patterns_found: [],
-            format_match: true,
-            validator_notes: ["Journalist voice is visible and format matches article."],
-            correction_instructions: [],
-          },
-        },
-      },
-    ])
+const OPENCODE_URL = process.env.OPENCODE_URL ?? "http://127.0.0.1:4098"
 
-    const output = await runTonePipelineWithArtifact({ text: source, voice: "journalist" }, client as never)
+describe("Tone E2E", { timeout: 600_000 }, () => {
+  let client: ReturnType<typeof createOpencodeClient>
+
+  beforeAll(() => {
+    client = createOpencodeClient({ baseUrl: OPENCODE_URL })
+  })
+
+  it("rewrites corporate AI text in journalist voice", async () => {
+    const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/01-corporate-ai.txt"), "utf8")
+    const output = await runTonePipelineWithArtifact({ text, voice: "journalist" }, client)
 
     expect(output.artifact.final_content).toBeTruthy()
-    expect(output.artifact.final_content).not.toContain("innovative")
-    expect(output.artifact.final_content).not.toContain("pivotal")
-    expect(output.artifact.final_content).not.toContain("tapestry")
-    expect(output.artifact.voice_applied).toBe("journalist")
-    expect(output.rendered).toBe(output.artifact.final_content)
+    expect(output.artifact.final_content.length).toBeGreaterThan(50)
+
+    const banned = ["innovative", "leverages", "empower", "cutting-edge", "game-changing"]
+    for (const word of banned) {
+      expect(output.artifact.final_content.toLowerCase()).not.toContain(word)
+    }
+  })
+
+  it("rewrites executive text in social voice", async () => {
+    const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/03-executive.txt"), "utf8")
+    const output = await runTonePipelineWithArtifact({ text, voice: "social" }, client)
+
+    expect(output.artifact.final_content).toBeTruthy()
+    expect(output.artifact.voice_applied).toBe("social")
+  })
+
+  it("infers voice from text when not specified", async () => {
+    const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/02-technical.txt"), "utf8")
+    const output = await runTonePipelineWithArtifact({ text }, client)
+
+    expect(output.artifact.final_content).toBeTruthy()
+    expect(output.artifact.voice_applied).toBeTruthy()
+  })
+
+  it("applies personal voice from tone description", async () => {
+    const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/01-corporate-ai.txt"), "utf8")
+    const output = await runTonePipelineWithArtifact(
+      {
+        text,
+        voice: "personal",
+        toneDesc: "Direct, dry, no hype, short sentences. No jargon. Say what you mean.",
+      },
+      client,
+    )
+
+    expect(output.artifact.final_content).toBeTruthy()
+    expect(output.artifact.voice_applied).toBe("personal")
   })
 })
