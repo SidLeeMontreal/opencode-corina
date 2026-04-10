@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin";
 import type { StepModelConfig } from "opencode-model-resolver";
 
 export type OpenCodeClient = PluginInput["client"];
+export type { AgentCapabilityOutput } from "opencode-text-tools";
 export type { ModelInfo, Preset, ResolvedModel, StepModelConfig } from "opencode-model-resolver";
 
 export type ToneVoice =

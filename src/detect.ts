@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { AI_PATTERN_MAP, detectAiPatterns, type Layer1Scan, type PatternMatch } from "opencode-text-tools";
 
+import { createCapabilityOutput } from "./capability-output.js";
 import { formatInline, formatJson, formatReport } from "./detect-formatters.js";
 import { runLayer2Analysis } from "./detect-layer2.js";
 import {
@@ -14,8 +15,8 @@ import {
   summaryFromVerdict,
   verdictFromScore,
 } from "./detect-scoring.js";
-import { runTonePipeline } from "./tone-pipeline.js";
-import type { DetectionReport, OpenCodeClient, PatternFinding } from "./types.js";
+import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
+import type { AgentCapabilityOutput, DetectionReport, OpenCodeClient, PatternFinding } from "./types.js";
 import { validate } from "./validators.js";
 
 interface ResolvedInput {
@@ -245,6 +246,11 @@ function autoFixInstructions(report: DetectionReport): string[] {
   ];
 }
 
+function buildInputSummary(resolved: ResolvedInput, report: DetectionReport): string {
+  const source = resolved.sourceType === "file" ? `file ${resolved.sourcePath ?? "(unknown path)"}` : "inline text";
+  return `Analyzed ${source} (${report.input.word_count} words, ${report.patterns_found.length} findings).`;
+}
+
 export interface DetectInput {
   text: string;
   format?: "inline" | "report" | "json";
@@ -253,12 +259,22 @@ export interface DetectInput {
   modelPreset?: string;
 }
 
-export async function runDetect(input: DetectInput, client: OpenCodeClient): Promise<string> {
+export async function runDetectWithArtifact(
+  input: DetectInput,
+  client: OpenCodeClient,
+): Promise<AgentCapabilityOutput<DetectionReport>> {
   const resolved = resolveInput(input.text);
   const text = cleanText(resolved.text);
 
   if (!text) {
-    return formatOutput("", emptyReport(resolved), input.format);
+    const report = emptyReport(resolved);
+    return createCapabilityOutput({
+      capability: "detect",
+      inputSummary: buildInputSummary(resolved, report),
+      artifact: report,
+      rendered: formatOutput("", report, input.format),
+      assumptions: report.assumptions,
+    });
   }
 
   const layer1Scan = detectAiPatterns(text);
@@ -305,10 +321,12 @@ export async function runDetect(input: DetectInput, client: OpenCodeClient): Pro
     report.assumptions.push(`DetectionReport validation warning: ${validation.errors.join("; ")}`);
   }
 
-  let output = formatOutput(text, report, input.format);
+  let rendered = formatOutput(text, report, input.format);
+  let chainedTo: string | undefined;
+  const assumptions = [...report.assumptions];
 
   if (input.autoFix) {
-    const fixed = await runTonePipeline(
+    const fixed = await runTonePipelineWithArtifact(
       {
         text,
         voice: input.voice,
@@ -317,18 +335,30 @@ export async function runDetect(input: DetectInput, client: OpenCodeClient): Pro
       },
       client,
     );
-    output = `${output}\n\nAuto-fix\n--------\n${fixed.final_content}`;
+    rendered = `${rendered}\n\nAuto-fix\n--------\n${fixed.artifact.final_content}`;
+    chainedTo = "tone";
+    assumptions.push("Auto-fix rewrite appended using Corina tone capability.");
   }
 
-  return output;
+  return createCapabilityOutput({
+    capability: "detect",
+    inputSummary: buildInputSummary(resolved, report),
+    artifact: report,
+    rendered,
+    chainedTo,
+    assumptions,
+  });
+}
+
+export async function runDetect(input: DetectInput, client: OpenCodeClient): Promise<string> {
+  const output = await runDetectWithArtifact(input, client);
+  return output.rendered;
 }
 
 export const runDetectPipeline = async (
   input: DetectInput,
   client: OpenCodeClient,
 ): Promise<{ report: DetectionReport; output: string; fixedText?: string }> => {
-  const output = await runDetect(input, client);
-  const resolved = resolveInput(input.text);
-  const report = emptyReport(resolved);
-  return { report, output };
+  const output = await runDetectWithArtifact(input, client);
+  return { report: output.artifact, output: output.rendered };
 };

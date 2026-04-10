@@ -3,7 +3,9 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createCapabilityOutput } from "./capability-output.js";
 import type {
+  AgentCapabilityOutput,
   BrandProfile,
   OpenCodeClient,
   PersonalVoiceProfile,
@@ -475,7 +477,16 @@ function makeToneOutputArtifact(
   };
 }
 
-export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClient): Promise<ToneOutputArtifact> {
+function buildInputSummary(inputArtifact: ToneInputArtifact): string {
+  const source = inputArtifact.source_path ? `file ${inputArtifact.source_path}` : "inline text";
+  const words = inputArtifact.source_metrics?.word_count ?? countWords(inputArtifact.original_text);
+  return `Rewrote ${source} in ${inputArtifact.voice} voice for ${inputArtifact.format} format (${words} words).`;
+}
+
+export async function runTonePipelineWithArtifact(
+  input: ToneRawInput,
+  client: OpenCodeClient,
+): Promise<AgentCapabilityOutput<ToneOutputArtifact>> {
   const assumptions: string[] = [];
   const { text: sourceText, sourcePath } = maybeResolveTextInput(input.text);
   const originalText = cleanText(sourceText);
@@ -493,7 +504,14 @@ export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClien
       assumptions: ["Source text was empty."],
       validation_score: 100,
     };
-    return emptyOutput;
+
+    return createCapabilityOutput({
+      capability: "tone",
+      inputSummary: "Received empty input for tone rewrite.",
+      artifact: emptyOutput,
+      rendered: emptyOutput.final_content,
+      assumptions: emptyOutput.assumptions,
+    });
   }
 
   let voice = (input.voice?.trim() as ToneVoice | undefined) ?? inferVoice(originalText);
@@ -597,5 +615,16 @@ export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClien
     ];
   }
 
-  return outputArtifact;
+  return createCapabilityOutput({
+    capability: "tone",
+    inputSummary: buildInputSummary(inputArtifact),
+    artifact: outputArtifact,
+    rendered: outputArtifact.final_content,
+    assumptions: outputArtifact.assumptions,
+  });
+}
+
+export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClient): Promise<string> {
+  const output = await runTonePipelineWithArtifact(input, client);
+  return output.rendered;
 }

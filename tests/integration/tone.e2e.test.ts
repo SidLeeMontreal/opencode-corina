@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { runTonePipeline } from "../../src/tone-pipeline.js"
+import { runTonePipelineWithArtifact } from "../../src/tone-pipeline.js"
 import { createMockClient } from "../helpers/mock-client.js"
 
 describe("tone pipeline", () => {
@@ -40,12 +40,13 @@ describe("tone pipeline", () => {
       },
     ])
 
-    const output = await runTonePipeline({ text: source, voice: "journalist" }, client as never)
+    const output = await runTonePipelineWithArtifact({ text: source, voice: "journalist" }, client as never)
 
-    expect(output.final_content).toBeTruthy()
-    expect(output.final_content).not.toContain("innovative")
-    expect(output.final_content).not.toContain("pivotal")
-    expect(output.final_content).not.toContain("tapestry")
-    expect(output.voice_applied).toBe("journalist")
+    expect(output.artifact.final_content).toBeTruthy()
+    expect(output.artifact.final_content).not.toContain("innovative")
+    expect(output.artifact.final_content).not.toContain("pivotal")
+    expect(output.artifact.final_content).not.toContain("tapestry")
+    expect(output.artifact.voice_applied).toBe("journalist")
+    expect(output.rendered).toBe(output.artifact.final_content)
   })
 })

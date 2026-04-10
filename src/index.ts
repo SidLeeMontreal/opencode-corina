@@ -3,9 +3,9 @@ import { tool } from "@opencode-ai/plugin";
 import type { StepModelConfig } from "opencode-model-resolver";
 
 import { writeAuditLog } from "./audit-log.js";
-import { runDetect } from "./detect.js";
-import { runPipeline } from "./pipeline.js";
-import { runTonePipeline } from "./tone-pipeline.js";
+import { runDetectWithArtifact } from "./detect.js";
+import { runPipelineWithArtifact } from "./pipeline.js";
+import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
 import type { PipelineModelConfig } from "./types.js";
 
 function buildUniformModelConfig(modelPreset?: "fast" | "balanced" | "quality"): Partial<PipelineModelConfig> | undefined {
@@ -36,9 +36,11 @@ export const CorinaPlugin: Plugin = async (input) => {
             .enum(["fast", "balanced", "quality"])
             .optional()
             .describe("Optional uniform model preset override for all pipeline steps."),
+          format: tool.schema.string().optional().describe("Optional output format. Use json for the universal envelope."),
         },
-        execute: async ({ brief, modelPreset }, toolCtx) => {
-          const output = await runPipeline(brief, input.client, buildUniformModelConfig(modelPreset));
+        execute: async ({ brief, modelPreset, format }, toolCtx) => {
+          const output = await runPipelineWithArtifact(brief, input.client, buildUniformModelConfig(modelPreset));
+          const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
           writeAuditLog({
             timestamp: new Date().toISOString(),
             event: "corina_write",
@@ -46,11 +48,12 @@ export const CorinaPlugin: Plugin = async (input) => {
             briefPreview: brief.slice(0, 160),
             outcome: "completed",
             metadata: {
-              outputLength: output.length,
+              outputLength: renderedOutput.length,
               modelPreset,
+              format,
             },
           });
-          return output;
+          return renderedOutput;
         },
       }),
       corina_tone: tool({
@@ -67,7 +70,10 @@ export const CorinaPlugin: Plugin = async (input) => {
           modelPreset: tool.schema.string().optional(),
         },
         execute: async (args, toolCtx) => {
-          const output = await runTonePipeline(args, input.client);
+          const wantsJson = args.format === "json";
+          const toneArgs = wantsJson ? { ...args, format: undefined } : args;
+          const output = await runTonePipelineWithArtifact(toneArgs, input.client);
+          const renderedOutput = wantsJson ? JSON.stringify(output, null, 2) : output.rendered;
           writeAuditLog({
             timestamp: new Date().toISOString(),
             event: "corina_tone",
@@ -78,10 +84,10 @@ export const CorinaPlugin: Plugin = async (input) => {
               voice: args.voice,
               format: args.format,
               modelPreset: args.modelPreset,
-              validationScore: output.validation_score,
+              validationScore: output.artifact.validation_score,
             },
           });
-          return output.final_content;
+          return renderedOutput;
         },
       }),
       corina_detect: tool({
@@ -95,7 +101,8 @@ export const CorinaPlugin: Plugin = async (input) => {
           modelPreset: tool.schema.string().optional(),
         },
         execute: async ({ text, format, autoFix, voice, modelPreset }, toolCtx) => {
-          const output = await runDetect({ text, format: format as any, autoFix, voice, modelPreset }, input.client);
+          const output = await runDetectWithArtifact({ text, format: format as any, autoFix, voice, modelPreset }, input.client);
+          const renderedOutput = format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
           writeAuditLog({
             timestamp: new Date().toISOString(),
             event: "corina_detect",
@@ -107,10 +114,10 @@ export const CorinaPlugin: Plugin = async (input) => {
               autoFix,
               voice,
               modelPreset,
-              outputLength: output.length,
+              outputLength: renderedOutput.length,
             },
           });
-          return output;
+          return renderedOutput;
         },
       }),
     },
