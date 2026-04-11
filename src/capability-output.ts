@@ -1,3 +1,9 @@
+/**
+ * Builds the standard `AgentCapabilityOutput` envelope for Corina tools (agent id, capability,
+ * timestamps, artifact vs rendered text, optional chain/metrics).
+ * `version` is read from this package's `package.json` beside the compiled module at load time;
+ * if that read fails, it falls back to `"0.0.0"`.
+ */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

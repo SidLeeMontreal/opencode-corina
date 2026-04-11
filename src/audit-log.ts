@@ -46,4 +46,9 @@ export function writeAuditLog(entry: AuditLogEntry): void {
   });
 }
 
+/** Awaits queued writes that were scheduled before this call. Use during graceful shutdown (after stopping new audit producers) or in tests. */
+export async function flushAuditLogs(): Promise<void> {
+  await appendQueue;
+}
+
 export { auditLogPath };
