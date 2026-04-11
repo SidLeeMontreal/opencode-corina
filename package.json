@@ -6,6 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "preinstall": "node scripts/ensure-opencode-deps.mjs",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run tests/unit",
@@ -24,15 +25,15 @@
     "@opencode-ai/plugin": "^1.4.1",
     "@opencode-ai/sdk": "^1.4.1",
     "ajv": "^8.17.1",
-    "opencode-model-resolver": "file:../opencode-model-resolver",
-    "opencode-text-tools": "file:../opencode-text-tools"
+    "opencode-model-resolver": "file:deps/opencode-model-resolver",
+    "opencode-text-tools": "file:deps/opencode-text-tools"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^4.1.4",
     "typescript": "^5.8.3",
     "vitest": "^4.1.4",
-    "opencode-eval-harness": "file:../opencode-eval-harness"
+    "opencode-eval-harness": "file:deps/opencode-eval-harness"
   },
   "keywords": [
     "opencode",

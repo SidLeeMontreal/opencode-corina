@@ -1,9 +1,9 @@
 {
-  "_comment": "Local plugin dependency file for OpenCode. The file: paths assume opencode-model-resolver and opencode-text-tools live as sibling repos under ~/dev/personal/.",
+  "_comment": "Local plugin deps for OpenCode. Run npm install in the repo root first so scripts/ensure-opencode-deps.mjs populates ../deps/.",
   "dependencies": {
     "@opencode-ai/plugin": "*",
     "@opencode-ai/sdk": "*",
-    "opencode-model-resolver": "file:../../opencode-model-resolver",
-    "opencode-text-tools": "file:../../opencode-text-tools"
+    "opencode-model-resolver": "file:../deps/opencode-model-resolver",
+    "opencode-text-tools": "file:../deps/opencode-text-tools"
   }
 }
