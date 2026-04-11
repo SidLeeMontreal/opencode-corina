@@ -1,5 +1,5 @@
 ---
-description: Legacy critic alias. Routes to the modular critic adjudicator prompt during the migration window.
+description: Modular critic adjudicator for Corina unified evaluation.
 mode: subagent
 hidden: true
 temperature: 0.1

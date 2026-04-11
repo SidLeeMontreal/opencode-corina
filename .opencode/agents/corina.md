@@ -10,6 +10,12 @@ permission:
     "*": deny
     "critic": allow
     "auditor": allow
+    "prose-evaluator": allow
+    "voice-evaluator": allow
+    "evidence-evaluator": allow
+    "format-auditor": allow
+    "critic-adjudicator": allow
+    "auditor-adjudicator": allow
     "detector": allow
     "tone-writer": allow
     "tone-validator": allow

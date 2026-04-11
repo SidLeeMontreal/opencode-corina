@@ -1,10 +1,16 @@
 import { ModelResolver } from "opencode-model-resolver";
+import type { ResolvedModel } from "opencode-model-resolver";
 
 import { createCapabilityOutput } from "./capability-output.js";
+import { deduplicateFindings, normalizeModuleOutput } from "./evaluation-normalizer.js";
+import { buildEvaluationContextFromWorkflowState, selectModules } from "./evaluation-registry.js";
+import { buildEvaluationContextBlock, isEvaluationV2Enabled, normalizeBlankLines, runEvaluationAgent } from "./evaluation-runtime.js";
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { DEFAULT_MODEL_CONFIG } from "./model-config.js";
+import { loadPrompt } from "./prompt-loader.js";
 import { runAudit, runBriefIntake, runCritique, runDraft, runOutline, runRevise } from "./steps.js";
-import type { AgentCapabilityOutput, AuditArtifact, OpenCodeClient, PipelineModelConfig, WorkflowState } from "./types.js";
+import { inferVoice } from "./tone-defaults.js";
+import type { AgentCapabilityOutput, AuditArtifact, EvaluationFinding, EvaluationModuleId, ModuleRunStatus, OpenCodeClient, PipelineModelConfig, WorkflowState } from "./types.js";
 import { validate } from "./validators.js";
 
 export function mergeModelConfig(modelConfig?: Partial<PipelineModelConfig>): PipelineModelConfig {
@@ -33,6 +39,149 @@ function buildFallbackAudit(note: string, finalContent: string | null = null): A
     style_violations: [],
     publishability_note: note,
     final_content: finalContent,
+  };
+}
+
+const AUDIT_MODULE_PROMPTS: Record<
+  Exclude<EvaluationModuleId, "critic-adjudicator" | "auditor-adjudicator">,
+  { promptFile: string; delimiter: string }
+> = {
+  "prose-evaluator": { promptFile: "tasks/prose-evaluator.md", delimiter: "prose_evaluation" },
+  "voice-evaluator": { promptFile: "tasks/voice-evaluator.md", delimiter: "voice_evaluation" },
+  "evidence-evaluator": { promptFile: "tasks/evidence-evaluator.md", delimiter: "evidence_evaluation" },
+  "format-auditor": { promptFile: "tasks/format-auditor.md", delimiter: "format_evaluation" },
+};
+
+function buildAuditModulePrompt(input: {
+  contextBlock: string;
+  draft: string;
+  brief?: string | null;
+  findings?: EvaluationFinding[];
+  moduleStatus?: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  voicePrompt?: string | null;
+}): string {
+  return [
+    input.contextBlock,
+    input.voicePrompt ? `=== VOICE PROFILE ===\n${input.voicePrompt.trim()}\n=== END VOICE PROFILE ===` : null,
+    input.brief ? `=== BRIEF TEXT ===\n${input.brief.trim()}\n=== END BRIEF TEXT ===` : null,
+    input.findings ? `=== FINDINGS ===\n${JSON.stringify(input.findings, null, 2)}\n=== END FINDINGS ===` : null,
+    input.moduleStatus ? `=== MODULE STATUS ===\n${JSON.stringify(input.moduleStatus, null, 2)}\n=== END MODULE STATUS ===` : null,
+    `=== DRAFT TEXT ===\n${input.draft.trim()}\n=== END DRAFT TEXT ===`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+async function runAuditV2(
+  client: OpenCodeClient,
+  state: WorkflowState,
+  model: ResolvedModel | undefined,
+  logger: AgentLogger,
+  usage: ReturnType<typeof createUsageAccumulator>,
+): Promise<AuditArtifact> {
+  const context = buildEvaluationContextFromWorkflowState(state, "audit");
+  const selectedModules = selectModules(context, "auditor");
+  const evaluatorModules = selectedModules.filter((module) => module.id !== "auditor-adjudicator");
+  const module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>> = {};
+  const contextBlock = buildEvaluationContextBlock(context);
+
+  logger.info("evaluation_plan_selected", {
+    capability: "pipeline",
+    step: "audit",
+    modules: selectedModules.map((module) => module.id),
+  });
+
+  const moduleOutputs = await Promise.all(
+    evaluatorModules.map(async (module) => {
+      const config = AUDIT_MODULE_PROMPTS[module.id as keyof typeof AUDIT_MODULE_PROMPTS];
+      try {
+        logger.debug("capability_start", { capability: "pipeline", step: module.id, module_id: module.id });
+        const result = await runEvaluationAgent({
+          client,
+          capability: "pipeline",
+          title: `Corina ${module.id}`,
+          step: module.id,
+          agent: module.id,
+          promptFile: config.promptFile,
+          delimiter: config.delimiter,
+          taskPrompt: buildAuditModulePrompt({
+            contextBlock,
+            brief: context.brief_text,
+            draft: context.draft_text,
+            voicePrompt: context.voice_prompt,
+          }),
+          model,
+          logger,
+          usage,
+        });
+        const normalized = normalizeModuleOutput(
+          {
+            ...(result.raw as Record<string, unknown>),
+            metrics: {
+              total_tokens: result.metrics.tokens?.total ?? 0,
+              total_cost: result.metrics.cost ?? 0,
+              duration_ms: result.metrics.duration_ms,
+              model_id: result.metrics.model_id,
+              provider_id: result.metrics.provider_id,
+            },
+          },
+          module.id,
+        );
+        module_status[module.id] = normalized.status;
+        logger.info("module_complete", { capability: "pipeline", step: "audit", module_id: module.id, status: normalized.status, finding_count: normalized.findings.length });
+        return normalized;
+      } catch (error) {
+        module_status[module.id] = "degraded";
+        return normalizeModuleOutput(
+          {
+            module_id: module.id,
+            status: "degraded",
+            skipped: false,
+            findings: [],
+            summary: `${module.id} degraded: ${error instanceof Error ? error.message : String(error)}`,
+            errors: [`${module.id} degraded: ${error instanceof Error ? error.message : String(error)}`],
+          },
+          module.id,
+        );
+      }
+    }),
+  );
+
+  const findings = deduplicateFindings(moduleOutputs.flatMap((output) => output.findings));
+  const result = await runEvaluationAgent({
+    client,
+    capability: "pipeline",
+    title: "Corina auditor adjudicator",
+    step: "auditor-adjudicator",
+    agent: "auditor-adjudicator",
+    promptFile: "tasks/auditor-adjudicator.md",
+    delimiter: "audit_result",
+    taskPrompt: buildAuditModulePrompt({
+      contextBlock,
+      brief: context.brief_text,
+      draft: context.draft_text,
+      findings,
+      moduleStatus: module_status,
+      voicePrompt: context.voice_prompt,
+    }),
+    model,
+    logger,
+    usage,
+  });
+
+  const rawArtifact = result.raw as Partial<AuditArtifact>;
+  return {
+    approved_for_delivery: Boolean(rawArtifact.approved_for_delivery) && !Object.values(module_status).includes("degraded"),
+    ai_patterns_remaining: Array.isArray(rawArtifact.ai_patterns_remaining) ? rawArtifact.ai_patterns_remaining : findings.filter((finding) => finding.module === "prose").map((finding) => finding.explanation),
+    banned_words_remaining: Array.isArray(rawArtifact.banned_words_remaining) ? rawArtifact.banned_words_remaining : findings.filter((finding) => finding.module === "voice" && finding.rule_id.includes("banned")).map((finding) => finding.explanation),
+    style_violations: Array.isArray(rawArtifact.style_violations) ? rawArtifact.style_violations : findings.filter((finding) => finding.module === "format").map((finding) => finding.explanation),
+    publishability_note: typeof rawArtifact.publishability_note === "string"
+      ? rawArtifact.publishability_note
+      : "Audit adjudicator degraded; delivery approval remains closed.",
+    final_content: typeof rawArtifact.final_content === "string" ? normalizeBlankLines(rawArtifact.final_content) : null,
+    findings,
+    module_status,
+    degraded: Object.values(module_status).includes("degraded") || rawArtifact.degraded === true,
   };
 }
 
@@ -81,6 +230,7 @@ export async function runPipelineWithArtifact(
       runBriefIntake(client, brief, briefModel, logger, usage),
     );
     state.briefArtifact = briefResult.artifact;
+    state.user_constraints = [...(state.briefArtifact.constraints ?? [])];
     state.warnings.push(...(briefResult.warnings ?? []));
 
     const briefValidation = validate("BriefArtifact", state.briefArtifact);
@@ -144,6 +294,8 @@ export async function runPipelineWithArtifact(
       runDraft(client, state.briefArtifact!, state.outlineArtifact!, draftModel, logger, usage),
     );
     state.draftArtifact = draftResult.artifact;
+    state.requested_voice = inferVoice(state.draftArtifact.content);
+    state.voice_prompt = state.requested_voice ? loadPrompt(`voices/${state.requested_voice}.md`) : undefined;
     state.warnings.push(...(draftResult.warnings ?? []));
 
     const draftValidation = validate("DraftArtifact", state.draftArtifact);
@@ -183,11 +335,22 @@ export async function runPipelineWithArtifact(
     }
 
     const auditModel = await resolver.resolveStepModel(config.audit, config.provider);
-    const { result: auditResult } = await runStep(logger, "audit", auditModel.modelID, () =>
-      runAudit(client, state.draftArtifact!, state.briefArtifact!, auditModel, logger, usage),
-    );
-    state.auditArtifact = auditResult.artifact;
-    state.warnings.push(...(auditResult.warnings ?? []));
+    if (isEvaluationV2Enabled()) {
+      logger.debug("step_start", { capability: "pipeline", step: "audit", model_id: auditModel.modelID, feature_flag: "CORINA_EVAL_V2=1" });
+      state.auditArtifact = await runAuditV2(client, state, auditModel, logger, usage);
+      logger.info("step_complete", {
+        capability: "pipeline",
+        step: "audit",
+        model_id: auditModel.modelID,
+        pass: state.auditArtifact.approved_for_delivery,
+      });
+    } else {
+      const { result: auditResult } = await runStep(logger, "audit", auditModel.modelID, () =>
+        runAudit(client, state.draftArtifact!, state.briefArtifact!, auditModel, logger, usage),
+      );
+      state.auditArtifact = auditResult.artifact;
+      state.warnings.push(...(auditResult.warnings ?? []));
+    }
 
     const auditValidation = validate("AuditArtifact", state.auditArtifact);
     if (!auditValidation.valid) {

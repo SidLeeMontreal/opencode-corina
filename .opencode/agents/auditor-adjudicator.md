@@ -1,5 +1,5 @@
 ---
-description: Legacy auditor alias. Routes to the modular auditor adjudicator prompt during the migration window.
+description: Modular auditor adjudicator for Corina unified evaluation.
 mode: subagent
 hidden: true
 temperature: 0.1

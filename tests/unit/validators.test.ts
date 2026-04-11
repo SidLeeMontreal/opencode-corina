@@ -35,11 +35,11 @@ describe("validators", () => {
       pass: true,
       overall_score: 22,
       dimensions: {
-        ai_patterns: { score: 5, issues: [] },
-        tone: { score: 4, issues: [] },
-        precision: { score: 4, issues: [] },
+        ai_patterns: { score: 6, issues: [] },
+        tone: { score: 5, issues: [] },
+        precision: { score: 5, issues: [] },
         evidence: { score: 4, issues: [] },
-        rhythm: { score: 5, issues: [] },
+        rhythm: { score: 6, issues: [] },
       },
       revision_instructions: [],
       fatal_issues: [],
@@ -51,9 +51,9 @@ describe("validators", () => {
   it("fails when a critique score is out of range", () => {
     const result = validate("CritiqueArtifact", {
       pass: false,
-      overall_score: 22,
+      overall_score: 31,
       dimensions: {
-        ai_patterns: { score: 6, issues: ["Too polished"] },
+        ai_patterns: { score: 7, issues: ["Too polished"] },
         tone: { score: 4, issues: [] },
         precision: { score: 4, issues: [] },
         evidence: { score: 4, issues: [] },

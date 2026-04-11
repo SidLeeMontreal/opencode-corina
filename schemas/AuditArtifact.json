@@ -9,6 +9,9 @@
     "banned_words_remaining": { "type": "array", "items": { "type": "string" } },
     "style_violations": { "type": "array", "items": { "type": "string" } },
     "publishability_note": { "type": "string", "minLength": 5 },
-    "final_content": { "type": ["string", "null"] }
+    "final_content": { "type": ["string", "null"] },
+    "findings": { "type": "array", "items": { "type": "object" } },
+    "module_status": { "type": "object" },
+    "degraded": { "type": "boolean" }
   }
 }

@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EvaluationFinding",
+  "type": "object",
+  "required": ["module", "rule_id", "severity", "excerpt", "explanation", "score_impact", "fix_hint"],
+  "properties": {
+    "module": { "type": "string", "enum": ["prose", "voice", "evidence", "format", "system"] },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^(prose|voice|evidence|format|system)\\..+\\..+$"
+    },
+    "severity": { "type": "string", "enum": ["blocking", "major", "minor"] },
+    "location": { "type": ["string", "null"] },
+    "excerpt": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "explanation": { "type": "string", "minLength": 1 },
+    "score_impact": { "type": "number", "minimum": -3, "maximum": 0 },
+    "fix_hint": { "type": "string", "minLength": 1 },
+    "duplicate_key": { "type": ["string", "null"] }
+  }
+}

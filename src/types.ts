@@ -66,6 +66,70 @@ export interface DraftArtifact {
   open_risks?: string[];
 }
 
+export type EvaluationKind = "critic" | "auditor";
+export type EvaluationModuleId =
+  | "prose-evaluator"
+  | "voice-evaluator"
+  | "evidence-evaluator"
+  | "format-auditor"
+  | "critic-adjudicator"
+  | "auditor-adjudicator";
+export type EvaluationSeverity = "blocking" | "major" | "minor";
+export type EvaluationModuleFamily = "prose" | "voice" | "evidence" | "format" | "system";
+export type ModuleRunStatus = "ok" | "skipped" | "degraded";
+
+export interface EvaluationFinding {
+  module: EvaluationModuleFamily;
+  rule_id: string;
+  severity: EvaluationSeverity;
+  location?: string | null;
+  excerpt: string;
+  explanation: string;
+  score_impact: number;
+  fix_hint: string;
+  duplicate_key?: string | null;
+}
+
+export interface EvaluationContext {
+  kind: EvaluationKind;
+  draft_text: string;
+  brief_text?: string | null;
+  requested_voice?: ToneVoice | null;
+  requested_format?: ToneFormat | null;
+  voice_prompt?: string | null;
+  brand_profile?: BrandProfile | null;
+  user_constraints: string[];
+  mode?: CritiqueMode | null;
+  audience?: string | null;
+  rubric_id?: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface ModuleOutput {
+  module_id: EvaluationModuleId;
+  status: "ok" | "skipped" | "degraded";
+  skipped: boolean;
+  findings: EvaluationFinding[];
+  summary: string;
+  errors?: string[];
+  warnings?: string[];
+  metrics?: {
+    total_tokens?: number;
+    total_cost?: number;
+    duration_ms?: number;
+    model_id?: string;
+    provider_id?: string;
+  };
+}
+
+export interface EvaluationModule {
+  id: EvaluationModuleId;
+  family: EvaluationModuleFamily;
+  kinds: EvaluationKind[];
+  order: number;
+  applies: (context: EvaluationContext) => boolean;
+}
+
 export interface CritiqueDimensionScore {
   score: number;
   issues: string[];
@@ -83,6 +147,9 @@ export interface CritiqueArtifact {
   };
   revision_instructions: string[];
   fatal_issues: string[];
+  findings?: EvaluationFinding[];
+  module_status?: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  degraded?: boolean;
 }
 
 export interface AuditArtifact {
@@ -92,6 +159,9 @@ export interface AuditArtifact {
   style_violations: string[];
   publishability_note: string;
   final_content?: string | null;
+  findings?: EvaluationFinding[];
+  module_status?: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  degraded?: boolean;
 }
 
 export interface PersonalVoiceProfile {
@@ -270,6 +340,9 @@ export interface WorkflowState {
   auditArtifact?: AuditArtifact;
   critiquePasses: number;
   warnings: string[];
+  requested_voice?: ToneVoice;
+  voice_prompt?: string;
+  user_constraints?: string[];
 }
 
 export type CritiqueMode = "quality" | "audience" | "rubric" | "compare";

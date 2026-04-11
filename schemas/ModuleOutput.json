@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ModuleOutput",
+  "type": "object",
+  "required": ["module_id", "status", "skipped", "findings", "summary"],
+  "properties": {
+    "module_id": {
+      "type": "string",
+      "enum": [
+        "prose-evaluator",
+        "voice-evaluator",
+        "evidence-evaluator",
+        "format-auditor",
+        "critic-adjudicator",
+        "auditor-adjudicator"
+      ]
+    },
+    "status": { "type": "string", "enum": ["ok", "skipped", "degraded"] },
+    "skipped": { "type": "boolean" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["module", "rule_id", "severity", "excerpt", "explanation", "score_impact", "fix_hint"],
+        "properties": {
+          "module": { "type": "string", "enum": ["prose", "voice", "evidence", "format", "system"] },
+          "rule_id": { "type": "string", "pattern": "^(prose|voice|evidence|format|system)\\..+\\..+$" },
+          "severity": { "type": "string", "enum": ["blocking", "major", "minor"] },
+          "location": { "type": ["string", "null"] },
+          "excerpt": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "explanation": { "type": "string", "minLength": 1 },
+          "score_impact": { "type": "number", "minimum": -3, "maximum": 0 },
+          "fix_hint": { "type": "string", "minLength": 1 },
+          "duplicate_key": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "summary": { "type": "string", "minLength": 1 },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "total_tokens": { "type": "number" },
+        "total_cost": { "type": "number" },
+        "duration_ms": { "type": "number" },
+        "model_id": { "type": "string" },
+        "provider_id": { "type": "string" }
+      }
+    }
+  }
+}

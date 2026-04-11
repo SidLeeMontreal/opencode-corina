@@ -20,8 +20,14 @@ User
 | Agent | Mode | Role |
 |---|---|---|
 | corina | primary | Front-facing writer. Owns conversation. Delegates to tools and subagents. |
-| critic | subagent | 5-dimension quality critique. Invoked by the `critique` tool. |
-| auditor | subagent | Binary 29-pattern AI checklist. Invoked by the `detect` tool. |
+| critic | subagent | Legacy alias during migration. Routes to the modular critic adjudicator prompt. |
+| auditor | subagent | Legacy alias during migration. Routes to the modular auditor adjudicator prompt. |
+| prose-evaluator | subagent | Universal prose-quality evaluator for critique/audit modular runs. |
+| voice-evaluator | subagent | Voice-alignment evaluator for critique/audit modular runs. |
+| evidence-evaluator | subagent | Evidence-integrity evaluator for critique/audit modular runs. |
+| format-auditor | subagent | Deterministic formatting evaluator for audit modular runs. |
+| critic-adjudicator | subagent | Aggregates evaluator findings into final critique output. |
+| auditor-adjudicator | subagent | Aggregates evaluator findings into final audit output. |
 | detector | subagent | LLM-based AI detection judge (Layer 2). Invoked by the `detect` tool. |
 | tone-writer | subagent | Voice application. Invoked by the `tone` tool. |
 | tone-validator | subagent | Validates tone rewrite quality. Invoked by the `tone` tool. |
@@ -80,7 +86,7 @@ Loader: `src/prompt-loader.ts` (checks override dir first, falls back to bundled
 Corina can spawn subagents via the built-in `Task` tool. `permission.task` in `corina.md`
 controls which subagents are accessible. Subagent names map to `.opencode/agents/*.md` filenames.
 
-Current allowed subagents: critic, auditor, detector, tone-writer, tone-validator, concise-auditor, concise-reviser, concise-stitcher, concise-reconciler
+Current allowed subagents: critic, auditor, prose-evaluator, voice-evaluator, evidence-evaluator, format-auditor, critic-adjudicator, auditor-adjudicator, detector, tone-writer, tone-validator, concise-auditor, concise-reviser, concise-stitcher, concise-reconciler
 
 To add a new invocable subagent:
 1. Create `.opencode/agents/your-agent.md` with `mode: subagent` and `hidden: true`

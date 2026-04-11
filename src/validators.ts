@@ -22,6 +22,8 @@ const validators = {
   BriefArtifact: ajv.compile(loadSchema("BriefArtifact.json")),
   OutlineArtifact: ajv.compile(loadSchema("OutlineArtifact.json")),
   DraftArtifact: ajv.compile(loadSchema("DraftArtifact.json")),
+  EvaluationFinding: ajv.compile(loadSchema("EvaluationFinding.json")),
+  ModuleOutput: ajv.compile(loadSchema("ModuleOutput.json")),
   CritiqueArtifact: ajv.compile(loadSchema("CritiqueArtifact.json")),
   CritiqueReport: ajv.compile(loadSchema("CritiqueReport.json")),
   AudienceCritiqueReport: ajv.compile(loadSchema("AudienceCritiqueReport.json")),

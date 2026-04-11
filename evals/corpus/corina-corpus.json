@@ -1,6 +1,6 @@
 {
   "id": "corina-corpus",
-  "version": "2026-04-10.5",
+  "version": "2026-04-10.6",
   "cases": [
     {
       "id": "tone-ai-to-journalist",
@@ -1325,6 +1325,400 @@
         "leadership-essay"
       ],
       "tier": 2
+    },
+    {
+      "id": "eval-prose-never-fail-tier1",
+      "label": "Prose evaluator never-fail envelope",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 1,
+      "input": {
+        "text": "A short draft.",
+        "mode": "quality",
+        "candidate": "<prose_evaluation>{\"module_id\":\"prose-evaluator\",\"status\":\"ok\",\"skipped\":false,\"findings\":[],\"summary\":\"No prose issues found.\"}</prose_evaluation>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "prose-evaluator",
+          "\"status\":\"ok\""
+        ],
+        "must_not_contain": [
+          "Traceback",
+          "undefined"
+        ]
+      },
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "prose",
+        "never-fail"
+      ]
+    },
+    {
+      "id": "eval-voice-missing-profile-tier1",
+      "label": "Voice evaluator skips cleanly without profile",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 1,
+      "input": {
+        "text": "Direct factual copy.",
+        "mode": "quality",
+        "candidate": "<voice_evaluation>{\"module_id\":\"voice-evaluator\",\"status\":\"skipped\",\"skipped\":true,\"findings\":[],\"summary\":\"No voice profile supplied.\"}</voice_evaluation>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "voice-evaluator",
+          "No voice profile supplied"
+        ],
+        "must_not_contain": [
+          "\"status\":\"degraded\""
+        ]
+      },
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "voice",
+        "never-fail"
+      ]
+    },
+    {
+      "id": "eval-evidence-fabricated-stat-tier1",
+      "label": "Evidence evaluator flags fabricated stat as blocking",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 1,
+      "input": {
+        "text": "Revenue grew 73% after launch.",
+        "mode": "quality",
+        "candidate": "<evidence_evaluation>{\"module_id\":\"evidence-evaluator\",\"status\":\"ok\",\"skipped\":false,\"findings\":[{\"module\":\"evidence\",\"rule_id\":\"evidence.fabrication.statistic_not_in_brief\",\"severity\":\"blocking\",\"location\":\"p1\",\"excerpt\":\"Revenue grew 73% after launch.\",\"explanation\":\"The statistic is not supported by the brief.\",\"score_impact\":-3,\"fix_hint\":\"Remove the number or source it from the brief.\"}],\"summary\":\"One blocking evidence issue found.\"}</evidence_evaluation>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "evidence.fabrication.statistic_not_in_brief",
+          "blocking"
+        ],
+        "must_not_contain": [
+          "minor"
+        ]
+      },
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "evidence",
+        "fabrication"
+      ]
+    },
+    {
+      "id": "eval-format-no-title-tier1",
+      "label": "Format auditor does not invent title findings when no title exists",
+      "capability": "pipeline",
+      "tier": 1,
+      "input": {
+        "text": "This paragraph starts immediately and never presents a standalone title.\n\nIt should not trigger title-only rules.",
+        "candidate": "<format_evaluation>{\"module_id\":\"format-auditor\",\"status\":\"ok\",\"skipped\":false,\"findings\":[],\"summary\":\"No format issues found.\"}</format_evaluation>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "format-auditor"
+        ],
+        "must_not_contain": [
+          "format.title.",
+          "title.too_long"
+        ]
+      },
+      "tags": [
+        "pipeline",
+        "evaluation-module",
+        "format",
+        "edge-case"
+      ]
+    },
+    {
+      "id": "eval-journalist-attribution-clean-tier1",
+      "label": "Journalist attribution is not falsely flagged by evidence evaluator",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 1,
+      "input": {
+        "text": "According to the study, response times fell after the rollout.",
+        "mode": "quality",
+        "voice": "journalist",
+        "candidate": "<evidence_evaluation>{\"module_id\":\"evidence-evaluator\",\"status\":\"ok\",\"skipped\":false,\"findings\":[],\"summary\":\"Journalistic attribution is appropriate here.\"}</evidence_evaluation>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "Journalistic attribution is appropriate"
+        ],
+        "must_not_contain": [
+          "vague attribution",
+          "blocking"
+        ]
+      },
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "journalist",
+        "evidence"
+      ]
+    },
+    {
+      "id": "eval-critic-pass-tier1",
+      "label": "Critic adjudicator passes a minor-only finding set",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 1,
+      "input": {
+        "text": "A restrained, sourced draft.",
+        "mode": "quality",
+        "candidate": "<critique_result>{\"pass\":true,\"overall_score\":24,\"dimensions\":{\"ai_patterns\":{\"score\":5,\"issues\":[]},\"tone\":{\"score\":5,\"issues\":[]},\"precision\":{\"score\":5,\"issues\":[]},\"evidence\":{\"score\":4,\"issues\":[\"Minor attribution cleanup.\"]},\"rhythm\":{\"score\":5,\"issues\":[]}},\"revision_instructions\":[\"Tighten the attribution phrase in paragraph 2.\"],\"fatal_issues\":[]}</critique_result>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "\"pass\":true",
+          "\"overall_score\":24"
+        ],
+        "must_not_contain": [
+          "fatal_issues\":[\""
+        ]
+      },
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "critic-adjudicator"
+      ]
+    },
+    {
+      "id": "eval-auditor-approve-tier1",
+      "label": "Auditor adjudicator approves a clean draft",
+      "capability": "pipeline",
+      "tier": 1,
+      "input": {
+        "text": "Clean final copy.\n\nNo banned words. No leftover structure issues.",
+        "candidate": "<audit_result>{\"approved_for_delivery\":true,\"ai_patterns_remaining\":[],\"banned_words_remaining\":[],\"style_violations\":[],\"publishability_note\":\"Content is clean and ready to deliver.\",\"final_content\":\"Clean final copy.\n\nNo banned words. No leftover structure issues.\"}</audit_result>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "\"approved_for_delivery\":true",
+          "Content is clean and ready to deliver"
+        ],
+        "must_not_contain": [
+          "\"approved_for_delivery\":false"
+        ]
+      },
+      "tags": [
+        "pipeline",
+        "evaluation-module",
+        "auditor-adjudicator",
+        "approve"
+      ]
+    },
+    {
+      "id": "eval-auditor-fail-tier1",
+      "label": "Auditor adjudicator fails a blocking finding set",
+      "capability": "pipeline",
+      "tier": 1,
+      "input": {
+        "text": "This is game-changing.",
+        "candidate": "<audit_result>{\"approved_for_delivery\":false,\"ai_patterns_remaining\":[\"promotional language: game-changing\"],\"banned_words_remaining\":[\"game-changing\"],\"style_violations\":[],\"publishability_note\":\"Blocking issue remains.\",\"final_content\":null}</audit_result>"
+      },
+      "expected": {
+        "score_min": 1,
+        "must_contain": [
+          "\"approved_for_delivery\":false",
+          "Blocking issue remains"
+        ],
+        "must_not_contain": [
+          "\"approved_for_delivery\":true"
+        ]
+      },
+      "tags": [
+        "pipeline",
+        "evaluation-module",
+        "auditor-adjudicator",
+        "fail"
+      ]
+    },
+    {
+      "id": "eval-voice-journalist-clean",
+      "label": "Tier 2 journalist voice stays clean",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 2,
+      "evaluation_module_test": true,
+      "input": {
+        "text": "According to the study, operating costs fell after the change.",
+        "mode": "quality",
+        "voice": "journalist",
+        "candidate": "The journalist voice stays restrained, uses attribution correctly, and should not trigger evidence false positives."
+      },
+      "expected": {
+        "score_min": 0.3,
+        "must_contain": [
+          "journalist",
+          "attribution"
+        ],
+        "must_not_contain": [
+          "blocking evidence error"
+        ]
+      },
+      "quality_dimensions": [
+        "consistency_with_voice",
+        "evidence_integrity",
+        "prose_quality",
+        "format_compliance"
+      ],
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "tier2",
+        "journalist"
+      ]
+    },
+    {
+      "id": "eval-voice-persuasive-evidence",
+      "label": "Tier 2 persuasive copy triggers evidence check",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 2,
+      "evaluation_module_test": true,
+      "input": {
+        "text": "This is the most powerful solution in the market.",
+        "mode": "quality",
+        "voice": "persuasive",
+        "candidate": "The persuasive voice is clear, but the unsupported superlative should be flagged by the evidence module."
+      },
+      "expected": {
+        "score_min": 0.3,
+        "must_contain": [
+          "unsupported superlative"
+        ],
+        "must_not_contain": [
+          "clean pass"
+        ]
+      },
+      "quality_dimensions": [
+        "consistency_with_voice",
+        "evidence_integrity",
+        "prose_quality",
+        "format_compliance"
+      ],
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "tier2",
+        "persuasive"
+      ]
+    },
+    {
+      "id": "eval-prose-ai-residue",
+      "label": "Tier 2 prose residue case",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 2,
+      "evaluation_module_test": true,
+      "input": {
+        "text": "In today's rapidly evolving landscape, this transformative solution serves as a testament to a vibrant future.",
+        "mode": "quality",
+        "candidate": "The prose evaluator should catch multiple AI residue patterns, including landscape, transformative language, and testimonial abstraction."
+      },
+      "expected": {
+        "score_min": 0.3,
+        "must_contain": [
+          "AI residue",
+          "landscape"
+        ],
+        "must_not_contain": [
+          "clean prose"
+        ]
+      },
+      "quality_dimensions": [
+        "consistency_with_voice",
+        "evidence_integrity",
+        "prose_quality",
+        "format_compliance"
+      ],
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "tier2",
+        "prose"
+      ]
+    },
+    {
+      "id": "eval-format-no-title",
+      "label": "Tier 2 no-title format edge case",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 2,
+      "evaluation_module_test": true,
+      "input": {
+        "text": "A paragraph without a standalone title should not trigger title checks.",
+        "mode": "quality",
+        "candidate": "The format module should stay quiet on title rules because no title is present."
+      },
+      "expected": {
+        "score_min": 0.3,
+        "must_contain": [
+          "no title"
+        ],
+        "must_not_contain": [
+          "format.title.too_long"
+        ]
+      },
+      "quality_dimensions": [
+        "consistency_with_voice",
+        "evidence_integrity",
+        "prose_quality",
+        "format_compliance"
+      ],
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "tier2",
+        "format"
+      ]
+    },
+    {
+      "id": "eval-voice-brand-sidlee",
+      "label": "Tier 2 brand voice posture case",
+      "capability": "critique",
+      "mode": "quality",
+      "tier": 2,
+      "evaluation_module_test": true,
+      "input": {
+        "text": "We made the point directly and kept the tone understated.",
+        "mode": "quality",
+        "voice": "brand",
+        "candidate": "The brand voice check should focus on posture and avoid inventing extra brand rules when none were supplied."
+      },
+      "expected": {
+        "score_min": 0.3,
+        "must_contain": [
+          "brand voice"
+        ],
+        "must_not_contain": [
+          "invented brand rule"
+        ]
+      },
+      "quality_dimensions": [
+        "consistency_with_voice",
+        "evidence_integrity",
+        "prose_quality",
+        "format_compliance"
+      ],
+      "tags": [
+        "critique",
+        "evaluation-module",
+        "tier2",
+        "brand"
+      ]
     }
   ]
 }
