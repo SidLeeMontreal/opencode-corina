@@ -3,6 +3,7 @@ import {
   buildEvaluationContextFromWorkflowState,
   selectModules,
 } from "../../src/evaluation-registry.js"
+import { loadRubric } from "../../src/critique-rubric.js"
 import type { EvaluationContext, WorkflowState } from "../../src/types.js"
 
 describe("evaluation registry", () => {
@@ -19,6 +20,7 @@ describe("evaluation registry", () => {
       mode: "quality",
       audience: null,
       rubric_id: null,
+      rubric_text: null,
       metadata: {},
       ...overrides,
     }
@@ -92,6 +94,34 @@ describe("evaluation registry", () => {
     expect(result.requested_format).toBe("article")
     expect(result.brief_text).toBe("Use sourced claims.")
     expect(result.metadata.pipeline_step).toBe("critique")
+  })
+
+  it("maps audience mode into evaluation context", () => {
+    const result = buildEvaluationContextFromCritiqueArgs(
+      { mode: "audience", audience: "cmo" },
+      "Roadmap update for revenue leaders.",
+      "Keep it clear.",
+    )
+
+    expect(result.mode).toBe("audience")
+    expect(result.audience).toBe("cmo")
+    expect(result.rubric_id).toBeNull()
+    expect(result.rubric_text).toBeNull()
+  })
+
+  it("maps rubric mode into evaluation context", () => {
+    const rubric = loadRubric("corina")
+    const result = buildEvaluationContextFromCritiqueArgs(
+      { mode: "rubric", rubric: "corina" },
+      "According to the report, revenue grew.",
+      "Use sourced claims.",
+      rubric,
+    )
+
+    expect(result.mode).toBe("rubric")
+    expect(result.rubric_id).toBe("corina")
+    expect(result.rubric_text).toContain("Pass threshold")
+    expect(result.audience).toBeNull()
   })
 
   it("builds workflow-state evaluation context with forwarded lightweight bridge fields", () => {

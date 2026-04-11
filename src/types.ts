@@ -102,6 +102,7 @@ export interface EvaluationContext {
   mode?: CritiqueMode | null;
   audience?: string | null;
   rubric_id?: string | null;
+  rubric_text?: string | null;
   metadata: Record<string, unknown>;
 }
 

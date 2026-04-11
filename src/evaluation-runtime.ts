@@ -76,25 +76,28 @@ async function deleteSession(client: OpenCodeClient, sessionId: string): Promise
   }
 }
 
-export function isEvaluationV2Enabled(): boolean {
-  return process.env["CORINA_EVAL_V2"] === "1";
-}
-
 export function buildEvaluationContextBlock(context: EvaluationContext): string {
   const tone = context.voice_prompt ? context.voice_prompt.split("\n").find((line) => line.trim()) ?? "set" : "none";
   const constraints = context.user_constraints.length ? context.user_constraints.join(" | ") : "none";
   const priorFindings = Array.isArray(context.metadata["prior_findings"])
     ? (context.metadata["prior_findings"] as string[]).join(" | ")
     : "none";
-
-  return [
+  const block = [
     "=== PIPELINE CONTEXT ===",
     `Voice: ${context.requested_voice ?? "none"} | Format: ${context.requested_format ?? "other"} | Mode: ${context.mode ?? context.kind}`,
     `Tone: ${tone}`,
     `Constraints: ${constraints}`,
+    `Audience: ${context.audience ?? "none"}`,
+    `Rubric: ${context.rubric_id ?? "none"}`,
     `Prior findings: ${priorFindings}`,
     "=== END PIPELINE CONTEXT ===",
-  ].join("\n");
+  ];
+
+  if (context.rubric_text?.trim()) {
+    block.push("=== RUBRIC TEXT ===", context.rubric_text.trim(), "=== END RUBRIC TEXT ===");
+  }
+
+  return block.join("\n");
 }
 
 export function extractDelimitedJson(text: string, tag: string): unknown {

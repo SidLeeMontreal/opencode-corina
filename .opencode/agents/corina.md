@@ -8,8 +8,6 @@ permission:
   webfetch: ask
   task:
     "*": deny
-    "critic": allow
-    "auditor": allow
     "prose-evaluator": allow
     "voice-evaluator": allow
     "evidence-evaluator": allow

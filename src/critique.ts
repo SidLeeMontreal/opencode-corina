@@ -20,7 +20,7 @@ import { loadPrompt } from "./prompt-loader.js";
 import { aggregateComparison } from "./critique-compare.js";
 import { deduplicateFindings, normalizeModuleOutput } from "./evaluation-normalizer.js";
 import { buildEvaluationContextFromCritiqueArgs, selectModules } from "./evaluation-registry.js";
-import { buildEvaluationContextBlock, isEvaluationV2Enabled, runEvaluationAgent } from "./evaluation-runtime.js";
+import { buildEvaluationContextBlock, runEvaluationAgent } from "./evaluation-runtime.js";
 import {
   formatAudienceInline,
   formatComparisonInline,
@@ -44,6 +44,7 @@ import type {
   CritiqueRenderFormat,
   CritiqueReport,
   DetectionReport,
+  EvaluationContext,
   EvaluationFinding,
   EvaluationModuleId,
   ModuleRunStatus,
@@ -725,23 +726,6 @@ async function finalizeOutput(
   return finalized;
 }
 
-async function runQualityMode(text: string, sourcePath: string | null, toneOutput: ToneOutputArtifact | undefined, detectionReport: DetectionReport | undefined, assumptions: string[], client: OpenCodeClient, model: ResolvedModel | undefined, logger: AgentLogger, usage: UsageAccumulator): Promise<CritiqueReport> {
-  const report = await runStructuredSession<CritiqueReport>({
-    client,
-    title: "Corina critique",
-    step: "quality",
-    agent: "critic",
-    personaFile: "deprecated/critic-v1.md",
-    schemaFile: "CritiqueReport.json",
-    taskPrompt: buildQualityPrompt({ text, sourcePath, toneOutput, detectionReport, assumptions }),
-    model,
-    logger,
-    usage,
-  });
-
-  return enrichQualityReport(report, assumptions);
-}
-
 const MODULE_PROMPTS: Record<
   Exclude<EvaluationModuleId, "critic-adjudicator" | "auditor-adjudicator">,
   { promptFile: string; delimiter: string }
@@ -800,17 +784,24 @@ function buildModuleTaskPrompt(input: {
     .join("\n\n");
 }
 
-async function runModularQualityCritique(
+async function runModularCritique(
   item: { text: string },
   options: RunCritiqueOptions,
   assumptions: string[],
+  resolvedRubric: ResolvedRubric | undefined,
   client: OpenCodeClient,
   model: ResolvedModel | undefined,
   logger: AgentLogger,
   usage: UsageAccumulator,
-): Promise<CritiqueArtifact> {
+): Promise<{
+  context: EvaluationContext;
+  findings: EvaluationFinding[];
+  module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  rawArtifact: unknown;
+  degraded: boolean;
+}> {
   const briefText = typeof options.__chainSourceText === "string" && options.__chainSourceText !== item.text ? options.__chainSourceText : undefined;
-  const context = buildEvaluationContextFromCritiqueArgs(options, item.text, briefText);
+  const context = buildEvaluationContextFromCritiqueArgs(options, item.text, briefText, resolvedRubric);
   const selectedModules = selectModules(context, "critic");
   const evaluatorModules = selectedModules.filter((module) => module.id !== "critic-adjudicator");
   const module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>> = {};
@@ -907,7 +898,22 @@ async function runModularQualityCritique(
     usage,
   });
 
-  const rawArtifact = adjudicatorResult.raw as CritiqueArtifact;
+  return {
+    context,
+    findings,
+    module_status,
+    rawArtifact: adjudicatorResult.raw,
+    degraded: Object.values(module_status).includes("degraded"),
+  };
+}
+
+function buildQualityArtifactFromModularResult(result: {
+  rawArtifact: unknown;
+  findings: EvaluationFinding[];
+  module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  degraded: boolean;
+}): CritiqueArtifact {
+  const rawArtifact = result.rawArtifact as CritiqueArtifact;
   const artifact: CritiqueArtifact = {
     pass: Boolean(rawArtifact.pass),
     overall_score: typeof rawArtifact.overall_score === "number" ? rawArtifact.overall_score : 0,
@@ -920,33 +926,168 @@ async function runModularQualityCritique(
     },
     revision_instructions: Array.isArray(rawArtifact.revision_instructions) ? rawArtifact.revision_instructions : [],
     fatal_issues: Array.isArray(rawArtifact.fatal_issues) ? rawArtifact.fatal_issues : [],
-    findings,
-    module_status,
-    degraded: Object.values(module_status).includes("degraded"),
+    findings: result.findings,
+    module_status: result.module_status,
+    degraded: result.degraded,
   };
 
   if (!rawArtifact.dimensions) {
     const base = { ai_patterns: 6, tone: 6, precision: 6, evidence: 6, rhythm: 6 };
-    for (const finding of findings) {
+    for (const finding of result.findings) {
       const dimension = classifyDimension(finding);
       if (!dimension) continue;
       base[dimension] = Math.max(0, base[dimension] - severityPenalty(finding));
     }
     artifact.dimensions = {
-      ai_patterns: { score: base.ai_patterns, issues: findings.filter((finding) => classifyDimension(finding) === "ai_patterns").map(summarizeFinding) },
-      tone: { score: base.tone, issues: findings.filter((finding) => classifyDimension(finding) === "tone").map(summarizeFinding) },
-      precision: { score: base.precision, issues: findings.filter((finding) => classifyDimension(finding) === "precision").map(summarizeFinding) },
-      evidence: { score: base.evidence, issues: findings.filter((finding) => classifyDimension(finding) === "evidence").map(summarizeFinding) },
-      rhythm: { score: base.rhythm, issues: findings.filter((finding) => classifyDimension(finding) === "rhythm").map(summarizeFinding) },
+      ai_patterns: { score: base.ai_patterns, issues: result.findings.filter((finding) => classifyDimension(finding) === "ai_patterns").map(summarizeFinding) },
+      tone: { score: base.tone, issues: result.findings.filter((finding) => classifyDimension(finding) === "tone").map(summarizeFinding) },
+      precision: { score: base.precision, issues: result.findings.filter((finding) => classifyDimension(finding) === "precision").map(summarizeFinding) },
+      evidence: { score: base.evidence, issues: result.findings.filter((finding) => classifyDimension(finding) === "evidence").map(summarizeFinding) },
+      rhythm: { score: base.rhythm, issues: result.findings.filter((finding) => classifyDimension(finding) === "rhythm").map(summarizeFinding) },
     };
     artifact.overall_score = Object.values(artifact.dimensions).reduce((sum, dimension) => sum + dimension.score, 0);
-    artifact.fatal_issues = findings.filter((finding) => finding.module === "evidence" && finding.severity === "blocking").map(summarizeFinding);
-    artifact.revision_instructions = findings.filter((finding) => finding.severity !== "minor").map((finding) => finding.fix_hint);
+    artifact.fatal_issues = result.findings.filter((finding) => finding.module === "evidence" && finding.severity === "blocking").map(summarizeFinding);
+    artifact.revision_instructions = result.findings.filter((finding) => finding.severity !== "minor").map((finding) => finding.fix_hint);
     artifact.pass = artifact.overall_score >= 22 && artifact.fatal_issues.length === 0;
     artifact.degraded = true;
   }
 
   return artifact;
+}
+
+function buildQualityReportFromArtifact(modularArtifact: CritiqueArtifact, assumptions: string[], issueIdPrefix = "eval"): CritiqueReport {
+  const artifact: CritiqueReport = {
+    status: modularArtifact.degraded ? "degraded" : "ok",
+    pass: modularArtifact.pass,
+    overall_score: modularArtifact.overall_score,
+    pass_threshold: 22,
+    dimensions: {
+      ai_patterns: { ...modularArtifact.dimensions.ai_patterns, strengths: [] },
+      tone: { ...modularArtifact.dimensions.tone, strengths: [] },
+      precision: { ...modularArtifact.dimensions.precision, strengths: [] },
+      evidence: { ...modularArtifact.dimensions.evidence, strengths: [] },
+      rhythm: { ...modularArtifact.dimensions.rhythm, strengths: [] },
+    },
+    issues: modularArtifact.findings?.map((finding, index) => ({
+      id: `${issueIdPrefix}_${index + 1}`,
+      dimension: classifyDimension(finding) ?? "precision",
+      severity: finding.severity === "blocking" ? "high" : finding.severity === "major" ? "medium" : "low",
+      summary: finding.explanation,
+      fix_direction: finding.fix_hint,
+    })) ?? [],
+    strengths: [],
+    revision_instructions: modularArtifact.revision_instructions,
+    fatal_issues: modularArtifact.fatal_issues,
+    assumptions: [...assumptions, ...(modularArtifact.degraded ? ["Unified evaluation framework ran in degraded mode."] : [])],
+  };
+
+  Object.assign(artifact as CritiqueReport & CritiqueArtifact, {
+    findings: modularArtifact.findings,
+    module_status: modularArtifact.module_status,
+    degraded: modularArtifact.degraded,
+  });
+
+  return artifact;
+}
+
+function buildAudienceReportFromModularResult(result: {
+  rawArtifact: unknown;
+  context: EvaluationContext;
+  findings: EvaluationFinding[];
+  module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  degraded: boolean;
+}, assumptions: string[]): AudienceCritiqueReport {
+  const rawArtifact = (result.rawArtifact ?? {}) as Partial<AudienceCritiqueReport>;
+  const audience = result.context.audience ?? "general";
+  const misses = result.findings.filter((finding) => finding.severity !== "minor").map((finding) => finding.explanation);
+  const resonancePenalty = result.findings.reduce((sum, finding) => sum + severityPenalty(finding), 0);
+
+  return {
+    status: rawArtifact.status ?? (result.degraded ? "degraded" : "ok"),
+    audience_requested: rawArtifact.audience_requested ?? result.context.audience ?? null,
+    audience_applied: rawArtifact.audience_applied ?? audience,
+    audience_inferred: rawArtifact.audience_inferred ?? !result.context.audience,
+    resonance_score: typeof rawArtifact.resonance_score === "number" ? rawArtifact.resonance_score : Math.max(0, 10 - resonancePenalty),
+    what_lands: Array.isArray(rawArtifact.what_lands)
+      ? rawArtifact.what_lands
+      : result.findings.length === 0
+        ? [`The draft broadly aligns with the needs of ${audience}.`]
+        : [],
+    what_misses: Array.isArray(rawArtifact.what_misses) ? rawArtifact.what_misses : misses,
+    unclear_points: Array.isArray(rawArtifact.unclear_points)
+      ? rawArtifact.unclear_points
+      : result.findings.filter((finding) => finding.module === "prose" || finding.module === "evidence").map((finding) => finding.explanation),
+    missing_for_audience: Array.isArray(rawArtifact.missing_for_audience)
+      ? rawArtifact.missing_for_audience
+      : result.findings.filter((finding) => finding.module === "evidence").map((finding) => finding.fix_hint),
+    jargon_risks: Array.isArray(rawArtifact.jargon_risks)
+      ? rawArtifact.jargon_risks
+      : result.findings.filter((finding) => finding.module === "prose" || finding.module === "voice").map((finding) => finding.explanation),
+    need_gaps: Array.isArray(rawArtifact.need_gaps)
+      ? rawArtifact.need_gaps
+      : result.findings.filter((finding) => finding.severity !== "minor").map((finding) => ({
+          type: finding.module === "evidence" ? "evidence" : finding.module === "voice" ? "trust" : "clarity",
+          summary: finding.explanation,
+          fix_direction: finding.fix_hint,
+        })),
+    rewrite_brief: Array.isArray(rawArtifact.rewrite_brief)
+      ? rawArtifact.rewrite_brief
+      : [...new Set(result.findings.filter((finding) => finding.severity !== "minor").map((finding) => finding.fix_hint))],
+    assumptions: [...(rawArtifact.assumptions ?? []), ...assumptions, ...(result.degraded ? ["Unified evaluation framework ran in degraded mode."] : [])],
+  };
+}
+
+function buildRubricReportFromModularResult(result: {
+  rawArtifact: unknown;
+  findings: EvaluationFinding[];
+  module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  degraded: boolean;
+}, rubric: ResolvedRubric, assumptions: string[]): RubricReport {
+  const rawArtifact = (result.rawArtifact ?? {}) as Partial<RubricReport>;
+  const dimensions = Array.isArray(rawArtifact.dimensions) && rawArtifact.dimensions.length
+    ? rawArtifact.dimensions
+    : rubric.dimensions.map((dimension) => {
+        const matchingFindings = result.findings.filter((finding) => classifyDimension(finding) === dimension.id);
+        const penalty = matchingFindings.reduce((sum, finding) => sum + severityPenalty(finding), 0);
+        const score = Math.max(0, dimension.max_score - penalty);
+        return {
+          id: dimension.id,
+          label: dimension.name,
+          score,
+          max_score: dimension.max_score,
+          rationale: matchingFindings.length
+            ? matchingFindings.map((finding) => finding.explanation).join(" ")
+            : "No rubric violations were surfaced for this dimension.",
+          strengths: matchingFindings.length === 0 ? ["Current draft satisfies this rubric dimension."] : [],
+          weaknesses: matchingFindings.map((finding) => finding.explanation),
+          fix_directions: [...new Set(matchingFindings.map((finding) => finding.fix_hint))],
+        };
+      });
+  const ranked = [...dimensions].sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
+  const totalScore = typeof rawArtifact.total_score === "number"
+    ? rawArtifact.total_score
+    : dimensions.reduce((sum, dimension) => sum + dimension.score, 0);
+  const maxTotalScore = typeof rawArtifact.max_total_score === "number"
+    ? rawArtifact.max_total_score
+    : dimensions.reduce((sum, dimension) => sum + dimension.max_score, 0);
+
+  return {
+    status: rawArtifact.status ?? (result.degraded ? "degraded" : "ok"),
+    rubric_id: rawArtifact.rubric_id ?? rubric.id,
+    rubric_name: rawArtifact.rubric_name ?? rubric.name,
+    voice_profile_hint: rawArtifact.voice_profile_hint ?? null,
+    total_score: totalScore,
+    max_total_score: maxTotalScore,
+    dimensions,
+    strongest_dimensions: Array.isArray(rawArtifact.strongest_dimensions) && rawArtifact.strongest_dimensions.length
+      ? rawArtifact.strongest_dimensions
+      : ranked.slice(0, 2).map((dimension) => dimension.label),
+    weakest_dimensions: Array.isArray(rawArtifact.weakest_dimensions) && rawArtifact.weakest_dimensions.length
+      ? rawArtifact.weakest_dimensions
+      : [...ranked].reverse().slice(0, 2).map((dimension) => dimension.label),
+    overall_assessment: rawArtifact.overall_assessment ?? `${rubric.name} score: ${totalScore}/${maxTotalScore}.`,
+    assumptions: [...(rawArtifact.assumptions ?? []), ...assumptions, ...(result.degraded ? ["Unified evaluation framework ran in degraded mode."] : [])],
+  };
 }
 
 export async function runCritiqueWithArtifact(
@@ -990,47 +1131,11 @@ export async function runCritiqueWithArtifact(
   if (normalized.mode === "quality") {
     const item = normalized.items[0];
     let artifact: CritiqueReport;
-    if (isEvaluationV2Enabled()) {
-      try {
-        const modularArtifact = await runModularQualityCritique(item, options, assumptions, client, model, logger, usage);
-        artifact = {
-          status: modularArtifact.degraded ? "degraded" : "ok",
-          pass: modularArtifact.pass,
-          overall_score: modularArtifact.overall_score,
-          pass_threshold: 22,
-          dimensions: {
-            ai_patterns: { ...modularArtifact.dimensions.ai_patterns, strengths: [] },
-            tone: { ...modularArtifact.dimensions.tone, strengths: [] },
-            precision: { ...modularArtifact.dimensions.precision, strengths: [] },
-            evidence: { ...modularArtifact.dimensions.evidence, strengths: [] },
-            rhythm: { ...modularArtifact.dimensions.rhythm, strengths: [] },
-          },
-          issues: modularArtifact.findings?.map((finding, index) => ({
-            id: `eval_${index + 1}`,
-            dimension: classifyDimension(finding) ?? "precision",
-            severity: finding.severity === "blocking" ? "high" : finding.severity === "major" ? "medium" : "low",
-            summary: finding.explanation,
-            fix_direction: finding.fix_hint,
-          })) ?? [],
-          strengths: [],
-          revision_instructions: modularArtifact.revision_instructions,
-          fatal_issues: modularArtifact.fatal_issues,
-          assumptions: [...assumptions, ...(modularArtifact.degraded ? ["Unified evaluation framework ran in degraded mode."] : [])],
-        };
-        Object.assign(artifact as CritiqueReport & CritiqueArtifact, {
-          findings: modularArtifact.findings,
-          module_status: modularArtifact.module_status,
-          degraded: modularArtifact.degraded,
-        });
-      } catch (error) {
-        artifact = buildFallbackQualityReport(item.text, assumptions, error);
-      }
-    } else {
-      try {
-        artifact = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model, logger, usage);
-      } catch (error) {
-        artifact = buildFallbackQualityReport(item.text, assumptions, error);
-      }
+    try {
+      const modularResult = await runModularCritique(item, options, assumptions, normalized.resolvedRubric, client, model, logger, usage);
+      artifact = buildQualityReportFromArtifact(buildQualityArtifactFromModularResult(modularResult), assumptions);
+    } catch (error) {
+      artifact = buildFallbackQualityReport(item.text, assumptions, error);
     }
 
     const validation = validate("CritiqueReport", artifact);
@@ -1057,27 +1162,8 @@ export async function runCritiqueWithArtifact(
     const item = normalized.items[0];
     let artifact: AudienceCritiqueReport;
     try {
-      artifact = await runStructuredSession<AudienceCritiqueReport>({
-        client,
-        title: "Corina audience critique",
-        step: "audience",
-        agent: "audience-critic",
-        personaFile: "tasks/audience-critic.md",
-        schemaFile: "AudienceCritiqueReport.json",
-        taskPrompt: buildAudiencePrompt({
-          text: item.text,
-          sourcePath: item.sourcePath,
-          audienceRequested: options.audience ?? null,
-          inferredAudience: normalized.inferredAudience,
-          toneOutput: item.toneOutput,
-          detectionReport: item.detectionReport,
-          assumptions,
-        }),
-        model,
-        logger,
-        usage,
-      });
-      artifact.assumptions = [...(artifact.assumptions ?? []), ...assumptions];
+      const modularResult = await runModularCritique(item, options, assumptions, normalized.resolvedRubric, client, model, logger, usage);
+      artifact = buildAudienceReportFromModularResult(modularResult, assumptions);
     } catch (error) {
       artifact = buildEmptyAudienceReport(options.audience ?? normalized.inferredAudience ?? null, [
         ...assumptions,
@@ -1110,26 +1196,8 @@ export async function runCritiqueWithArtifact(
     const item = normalized.items[0];
     let artifact: RubricReport;
     try {
-      artifact = await runStructuredSession<RubricReport>({
-        client,
-        title: "Corina rubric critique",
-        step: "rubric",
-        agent: "rubric-critic",
-        personaFile: "tasks/rubric-critic.md",
-        schemaFile: "RubricReport.json",
-        taskPrompt: buildRubricPrompt({
-          text: item.text,
-          sourcePath: item.sourcePath,
-          rubric: normalized.resolvedRubric!,
-          toneOutput: item.toneOutput,
-          detectionReport: item.detectionReport,
-          assumptions,
-        }),
-        model,
-        logger,
-        usage,
-      });
-      artifact.assumptions = [...(artifact.assumptions ?? []), ...assumptions];
+      const modularResult = await runModularCritique(item, options, assumptions, normalized.resolvedRubric, client, model, logger, usage);
+      artifact = buildRubricReportFromModularResult(modularResult, normalized.resolvedRubric!, assumptions);
     } catch (error) {
       artifact = buildFallbackRubricReport(normalized.resolvedRubric, assumptions, error, item.text);
     }
@@ -1165,44 +1233,12 @@ export async function runCritiqueWithArtifact(
 
   for (const item of normalized.items) {
     try {
-      if (isEvaluationV2Enabled()) {
-        const modularArtifact = await runModularQualityCritique(item, options, assumptions, client, model, logger, usage);
-        const report: CritiqueReport = {
-          status: modularArtifact.degraded ? "degraded" : "ok",
-          pass: modularArtifact.pass,
-          overall_score: modularArtifact.overall_score,
-          pass_threshold: 22,
-          dimensions: {
-            ai_patterns: { ...modularArtifact.dimensions.ai_patterns, strengths: [] },
-            tone: { ...modularArtifact.dimensions.tone, strengths: [] },
-            precision: { ...modularArtifact.dimensions.precision, strengths: [] },
-            evidence: { ...modularArtifact.dimensions.evidence, strengths: [] },
-            rhythm: { ...modularArtifact.dimensions.rhythm, strengths: [] },
-          },
-          issues: modularArtifact.findings?.map((finding, index) => ({
-            id: `${item.id}_${index + 1}`,
-            dimension: classifyDimension(finding) ?? "precision",
-            severity: finding.severity === "blocking" ? "high" : finding.severity === "major" ? "medium" : "low",
-            summary: finding.explanation,
-            fix_direction: finding.fix_hint,
-          })) ?? [],
-          strengths: [],
-          revision_instructions: modularArtifact.revision_instructions,
-          fatal_issues: modularArtifact.fatal_issues,
-          assumptions: assumptions,
-        };
-        Object.assign(report as CritiqueReport & CritiqueArtifact, {
-          findings: modularArtifact.findings,
-          module_status: modularArtifact.module_status,
-          degraded: modularArtifact.degraded,
-        });
-        reports.push({ label: item.label, score: report.overall_score, report, itemId: item.id, text: item.text });
-        if (modularArtifact.degraded) {
-          skippedInputs.push(`${item.label} (modular critique degraded)`);
-        }
-      } else {
-        const report = await runQualityMode(item.text, item.sourcePath, item.toneOutput, item.detectionReport, assumptions, client, model, logger, usage);
-        reports.push({ label: item.label, score: report.overall_score, report, itemId: item.id, text: item.text });
+      const modularResult = await runModularCritique(item, options, assumptions, normalized.resolvedRubric, client, model, logger, usage);
+      const modularArtifact = buildQualityArtifactFromModularResult(modularResult);
+      const report = buildQualityReportFromArtifact(modularArtifact, assumptions, item.id);
+      reports.push({ label: item.label, score: report.overall_score, report, itemId: item.id, text: item.text });
+      if (modularArtifact.degraded) {
+        skippedInputs.push(`${item.label} (modular critique degraded)`);
       }
     } catch (error) {
       const report = buildFallbackQualityReport(item.text, assumptions, error);

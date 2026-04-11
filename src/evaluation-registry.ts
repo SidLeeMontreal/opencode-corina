@@ -8,6 +8,7 @@ import type {
   EvaluationContext,
   EvaluationKind,
   EvaluationModule,
+  ResolvedRubric,
   ToneVoice,
   WorkflowState,
 } from "./types.js";
@@ -102,7 +103,9 @@ export function buildEvaluationContextFromCritiqueArgs(
   args: RunCritiqueOptions,
   draft: string,
   brief?: string,
+  resolvedRubric?: ResolvedRubric,
 ): EvaluationContext {
+  const mode = args.mode ?? "quality";
   const requested_voice = normalizeRequestedVoice(args.voice, draft);
   return {
     kind: "critic",
@@ -124,12 +127,15 @@ export function buildEvaluationContextFromCritiqueArgs(
         }
       : null,
     user_constraints: [],
-    mode: args.mode ?? "quality",
-    audience: args.audience ?? null,
-    rubric_id: args.rubric ?? null,
+    mode,
+    audience: mode === "audience" ? args.audience ?? null : null,
+    rubric_id: mode === "rubric" ? resolvedRubric?.id ?? args.rubric ?? null : null,
+    rubric_text: mode === "rubric" ? resolvedRubric?.raw_markdown ?? null : null,
     metadata: {
       pipeline_step: "critique",
       chain: args.chain ?? null,
+      rubric_name: mode === "rubric" ? resolvedRubric?.name ?? null : null,
+      rubric_source_path: mode === "rubric" ? resolvedRubric?.source_path ?? null : null,
     },
   };
 }
@@ -160,6 +166,7 @@ export function buildEvaluationContextFromWorkflowState(state: WorkflowState, ki
     mode: null,
     audience: state.briefArtifact?.audience ?? null,
     rubric_id: null,
+    rubric_text: null,
     metadata: {
       pipeline_step: "audit",
       critique_pass: state.critiquePasses,

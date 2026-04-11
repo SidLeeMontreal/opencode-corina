@@ -14,8 +14,13 @@ import {
   type UsageAccumulator,
 } from "./logger.js";
 import { loadPrompt } from "./prompt-loader.js";
+import { deduplicateFindings, normalizeModuleOutput } from "./evaluation-normalizer.js";
+import { buildEvaluationContextFromCritiqueArgs, selectModules } from "./evaluation-registry.js";
+import { buildEvaluationContextBlock, runEvaluationAgent } from "./evaluation-runtime.js";
 import type {
-  AuditArtifact,
+  EvaluationFinding,
+  EvaluationModuleId,
+  ModuleRunStatus,
   BriefArtifact,
   CritiqueArtifact,
   DraftArtifact,
@@ -367,6 +372,64 @@ export async function runDraft(
   };
 }
 
+const MODULE_PROMPTS: Record<
+  Exclude<EvaluationModuleId, "critic-adjudicator" | "auditor-adjudicator">,
+  { promptFile: string; delimiter: string }
+> = {
+  "prose-evaluator": { promptFile: "tasks/prose-evaluator.md", delimiter: "prose_evaluation" },
+  "voice-evaluator": { promptFile: "tasks/voice-evaluator.md", delimiter: "voice_evaluation" },
+  "evidence-evaluator": { promptFile: "tasks/evidence-evaluator.md", delimiter: "evidence_evaluation" },
+  "format-auditor": { promptFile: "tasks/format-auditor.md", delimiter: "format_evaluation" },
+};
+
+function severityPenalty(finding: EvaluationFinding): number {
+  if (typeof finding.score_impact === "number" && finding.score_impact < 0) {
+    return Math.abs(finding.score_impact);
+  }
+
+  if (finding.severity === "blocking") return 3;
+  if (finding.severity === "major") return 2;
+  return 1;
+}
+
+function classifyDimension(finding: EvaluationFinding): keyof CritiqueArtifact["dimensions"] | null {
+  if (finding.module === "voice") return "tone";
+  if (finding.module === "evidence") return "evidence";
+  if (finding.module !== "prose") return null;
+  if (finding.rule_id.startsWith("prose.rhythm.")) return "rhythm";
+  if (finding.rule_id.startsWith("prose.precision.")) return "precision";
+  return "ai_patterns";
+}
+
+function summarizeFinding(finding: EvaluationFinding): string {
+  const location = finding.location ? ` (${finding.location})` : "";
+  return `${finding.rule_id}${location}: ${finding.explanation}`;
+}
+
+function buildModuleTaskPrompt(input: {
+  contextBlock: string;
+  draft: string;
+  brief?: string | null;
+  findings?: EvaluationFinding[];
+  moduleStatus?: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
+  voicePrompt?: string | null;
+}): string {
+  return [
+    input.contextBlock,
+    input.voicePrompt ? `=== VOICE PROFILE ===\n${input.voicePrompt.trim()}\n=== END VOICE PROFILE ===` : null,
+    input.brief ? `=== BRIEF TEXT ===\n${input.brief.trim()}\n=== END BRIEF TEXT ===` : null,
+    input.findings
+      ? `=== FINDINGS ===\n${JSON.stringify(input.findings, null, 2)}\n=== END FINDINGS ===`
+      : null,
+    input.moduleStatus
+      ? `=== MODULE STATUS ===\n${JSON.stringify(input.moduleStatus, null, 2)}\n=== END MODULE STATUS ===`
+      : null,
+    `=== DRAFT TEXT ===\n${input.draft.trim()}\n=== END DRAFT TEXT ===`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export async function runCritique(
   client: OpenCodeClient,
   draft: DraftArtifact,
@@ -375,32 +438,129 @@ export async function runCritique(
   logger?: AgentLogger,
   usage?: UsageAccumulator,
 ): Promise<StepResult<CritiqueArtifact>> {
-  const artifact = await runSession<CritiqueArtifact>({
+  const context = buildEvaluationContextFromCritiqueArgs({ mode: "quality" }, draft.content, JSON.stringify(brief, null, 2));
+  const selectedModules = selectModules(context, "critic");
+  const evaluatorModules = selectedModules.filter((module) => module.id !== "critic-adjudicator");
+  const module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>> = {};
+  const contextBlock = buildEvaluationContextBlock(context);
+
+  const moduleResults = await Promise.all(
+    evaluatorModules.map(async (module) => {
+      const config = MODULE_PROMPTS[module.id as keyof typeof MODULE_PROMPTS];
+      try {
+        const result = await runEvaluationAgent({
+          client,
+          capability: "pipeline",
+          title: `Corina ${module.id}`,
+          step: module.id,
+          agent: module.id,
+          promptFile: config.promptFile,
+          delimiter: config.delimiter,
+          taskPrompt: buildModuleTaskPrompt({
+            contextBlock,
+            brief: context.brief_text,
+            draft: context.draft_text,
+            voicePrompt: context.voice_prompt,
+          }),
+          model,
+          logger: logger ?? makeConsoleLogger("corina"),
+          usage,
+        });
+        const normalized = normalizeModuleOutput(
+          {
+            ...(result.raw as Record<string, unknown>),
+            metrics: {
+              total_tokens: result.metrics.tokens?.total ?? 0,
+              total_cost: result.metrics.cost ?? 0,
+              duration_ms: result.metrics.duration_ms,
+              model_id: result.metrics.model_id,
+              provider_id: result.metrics.provider_id,
+            },
+          },
+          module.id,
+        );
+        module_status[module.id] = normalized.status;
+        return normalized;
+      } catch (error) {
+        module_status[module.id] = "degraded";
+        return normalizeModuleOutput(
+          {
+            module_id: module.id,
+            status: "degraded",
+            skipped: false,
+            findings: [],
+            summary: `${module.id} degraded: ${error instanceof Error ? error.message : String(error)}`,
+            errors: [`${module.id} degraded: ${error instanceof Error ? error.message : String(error)}`],
+          },
+          module.id,
+        );
+      }
+    }),
+  );
+
+  const findings = deduplicateFindings(moduleResults.flatMap((result) => result.findings));
+  const adjudicator = await runEvaluationAgent({
     client,
-    title: "Corina critique",
-    step: "critique",
-    agent: "critic",
-    personaFile: "deprecated/critic-v1.md",
-    schemaFile: "CritiqueArtifact.json",
+    capability: "pipeline",
+    title: "Corina critic adjudicator",
+    step: "critic-adjudicator",
+    agent: "critic-adjudicator",
+    promptFile: "tasks/critic-adjudicator.md",
+    delimiter: "critique_result",
+    taskPrompt: buildModuleTaskPrompt({
+      contextBlock,
+      brief: context.brief_text,
+      draft: context.draft_text,
+      findings,
+      moduleStatus: module_status,
+      voicePrompt: context.voice_prompt,
+    }),
     model,
-    logger,
+    logger: logger ?? makeConsoleLogger("corina"),
     usage,
-    taskPrompt: [
-      "Evaluate the draft against the brief and return a CritiqueArtifact.",
-      "Return JSON only via the schema formatter for this step.",
-      "Be strict. Identify AI-pattern failures, evidence problems, tone problems, and rhythm issues.",
-      "",
-      "BRIEF ARTIFACT:",
-      JSON.stringify(brief, null, 2),
-      "",
-      "DRAFT ARTIFACT:",
-      JSON.stringify(draft, null, 2),
-    ].join("\n"),
   });
+
+  const rawArtifact = adjudicator.raw as CritiqueArtifact;
+  const artifact: CritiqueArtifact = {
+    pass: Boolean(rawArtifact.pass),
+    overall_score: typeof rawArtifact.overall_score === "number" ? rawArtifact.overall_score : 0,
+    dimensions: rawArtifact.dimensions ?? {
+      ai_patterns: { score: 6, issues: [] },
+      tone: { score: 6, issues: [] },
+      precision: { score: 6, issues: [] },
+      evidence: { score: 6, issues: [] },
+      rhythm: { score: 6, issues: [] },
+    },
+    revision_instructions: Array.isArray(rawArtifact.revision_instructions) ? rawArtifact.revision_instructions : [],
+    fatal_issues: Array.isArray(rawArtifact.fatal_issues) ? rawArtifact.fatal_issues : [],
+    findings,
+    module_status,
+    degraded: Object.values(module_status).includes("degraded"),
+  };
+
+  if (!rawArtifact.dimensions) {
+    const base = { ai_patterns: 6, tone: 6, precision: 6, evidence: 6, rhythm: 6 };
+    for (const finding of findings) {
+      const dimension = classifyDimension(finding);
+      if (!dimension) continue;
+      base[dimension] = Math.max(0, base[dimension] - severityPenalty(finding));
+    }
+    artifact.dimensions = {
+      ai_patterns: { score: base.ai_patterns, issues: findings.filter((finding) => classifyDimension(finding) === "ai_patterns").map(summarizeFinding) },
+      tone: { score: base.tone, issues: findings.filter((finding) => classifyDimension(finding) === "tone").map(summarizeFinding) },
+      precision: { score: base.precision, issues: findings.filter((finding) => classifyDimension(finding) === "precision").map(summarizeFinding) },
+      evidence: { score: base.evidence, issues: findings.filter((finding) => classifyDimension(finding) === "evidence").map(summarizeFinding) },
+      rhythm: { score: base.rhythm, issues: findings.filter((finding) => classifyDimension(finding) === "rhythm").map(summarizeFinding) },
+    };
+    artifact.overall_score = Object.values(artifact.dimensions).reduce((sum, dimension) => sum + dimension.score, 0);
+    artifact.fatal_issues = findings.filter((finding) => finding.module === "evidence" && finding.severity === "blocking").map(summarizeFinding);
+    artifact.revision_instructions = findings.filter((finding) => finding.severity !== "minor").map((finding) => finding.fix_hint);
+    artifact.pass = artifact.overall_score >= 22 && artifact.fatal_issues.length === 0;
+    artifact.degraded = true;
+  }
 
   return { artifact };
 }
-
 export async function runRevise(
   client: OpenCodeClient,
   draft: DraftArtifact,
@@ -439,41 +599,4 @@ export async function runRevise(
       word_count: countWords(content),
     },
   };
-}
-
-export async function runAudit(
-  client: OpenCodeClient,
-  draft: DraftArtifact,
-  brief: BriefArtifact,
-  model?: ResolvedModel,
-  logger?: AgentLogger,
-  usage?: UsageAccumulator,
-): Promise<StepResult<AuditArtifact>> {
-  const artifact = await runSession<AuditArtifact>({
-    client,
-    title: "Corina audit",
-    step: "audit",
-    agent: "auditor",
-    personaFile: "deprecated/auditor-v1.md",
-    schemaFile: "AuditArtifact.json",
-    model,
-    logger,
-    usage,
-    taskPrompt: [
-      "Run the final audit on this draft and return an AuditArtifact.",
-      "Return JSON only via the schema formatter for this step.",
-      "Approve only if the text is clean for delivery.",
-      "",
-      "BRIEF ARTIFACT:",
-      JSON.stringify(brief, null, 2),
-      "",
-      "DRAFT ARTIFACT:",
-      JSON.stringify(draft, null, 2),
-    ].join("\n"),
-  });
-
-  const bannedWords = sanitizeWords(draft.content);
-  const warnings = bannedWords.length ? [`Local banned-word scan still sees: ${bannedWords.join(", ")}`] : [];
-
-  return { artifact, warnings };
 }

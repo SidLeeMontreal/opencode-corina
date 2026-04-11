@@ -4,11 +4,11 @@ import type { ResolvedModel } from "opencode-model-resolver";
 import { createCapabilityOutput } from "./capability-output.js";
 import { deduplicateFindings, normalizeModuleOutput } from "./evaluation-normalizer.js";
 import { buildEvaluationContextFromWorkflowState, selectModules } from "./evaluation-registry.js";
-import { buildEvaluationContextBlock, isEvaluationV2Enabled, normalizeBlankLines, runEvaluationAgent } from "./evaluation-runtime.js";
+import { buildEvaluationContextBlock, normalizeBlankLines, runEvaluationAgent } from "./evaluation-runtime.js";
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { DEFAULT_MODEL_CONFIG } from "./model-config.js";
 import { loadPrompt } from "./prompt-loader.js";
-import { runAudit, runBriefIntake, runCritique, runDraft, runOutline, runRevise } from "./steps.js";
+import { runBriefIntake, runCritique, runDraft, runOutline, runRevise } from "./steps.js";
 import { inferVoice } from "./tone-defaults.js";
 import type { AgentCapabilityOutput, AuditArtifact, EvaluationFinding, EvaluationModuleId, ModuleRunStatus, OpenCodeClient, PipelineModelConfig, WorkflowState } from "./types.js";
 import { validate } from "./validators.js";
@@ -335,22 +335,14 @@ export async function runPipelineWithArtifact(
     }
 
     const auditModel = await resolver.resolveStepModel(config.audit, config.provider);
-    if (isEvaluationV2Enabled()) {
-      logger.debug("step_start", { capability: "pipeline", step: "audit", model_id: auditModel.modelID, feature_flag: "CORINA_EVAL_V2=1" });
-      state.auditArtifact = await runAuditV2(client, state, auditModel, logger, usage);
-      logger.info("step_complete", {
-        capability: "pipeline",
-        step: "audit",
-        model_id: auditModel.modelID,
-        pass: state.auditArtifact.approved_for_delivery,
-      });
-    } else {
-      const { result: auditResult } = await runStep(logger, "audit", auditModel.modelID, () =>
-        runAudit(client, state.draftArtifact!, state.briefArtifact!, auditModel, logger, usage),
-      );
-      state.auditArtifact = auditResult.artifact;
-      state.warnings.push(...(auditResult.warnings ?? []));
-    }
+    logger.debug("step_start", { capability: "pipeline", step: "audit", model_id: auditModel.modelID });
+    state.auditArtifact = await runAuditV2(client, state, auditModel, logger, usage);
+    logger.info("step_complete", {
+      capability: "pipeline",
+      step: "audit",
+      model_id: auditModel.modelID,
+      pass: state.auditArtifact.approved_for_delivery,
+    });
 
     const auditValidation = validate("AuditArtifact", state.auditArtifact);
     if (!auditValidation.valid) {
