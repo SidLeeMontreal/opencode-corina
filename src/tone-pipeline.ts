@@ -14,7 +14,7 @@ import {
   type AgentLogger,
   type UsageAccumulator,
 } from "./logger.js";
-import { loadPrompt, promptExists, PROMPTS_DIR } from "./prompt-loader.js";
+import { loadPrompt, promptExists, PROMPTS_DIR, voicePromptRelativePath } from "./prompt-loader.js";
 import type {
   AgentCapabilityOutput,
   BrandProfile,
@@ -671,7 +671,7 @@ export async function runTonePipelineWithArtifact(
       assumptions.push(`ToneInputArtifact validation warning: ${inputValidation.errors.join("; ")}`);
     }
 
-    const voiceProfileRelativePath = `voices/${voice}.md`;
+    const voiceProfileRelativePath = voicePromptRelativePath(voice);
     const voiceProfile = promptExists(voiceProfileRelativePath)
       ? loadPrompt(voiceProfileRelativePath)
       : `Voice profile missing for ${voice}. Preserve facts. Produce usable output.`;

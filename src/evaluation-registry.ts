@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { RunCritiqueOptions } from "./critique.js";
-import { PROMPTS_DIR, promptExists, loadPrompt } from "./prompt-loader.js";
+import { PROMPTS_DIR, promptExists, loadPrompt, voicePromptRelativePath } from "./prompt-loader.js";
 import { inferFormat, inferVoice } from "./tone-defaults.js";
 import type {
   EvaluationContext,
@@ -21,7 +21,7 @@ function loadVoicePrompt(voice: ToneVoice | null | undefined): string | null {
     return null;
   }
 
-  const relativePath = `voices/${voice}.md`;
+  const relativePath = voicePromptRelativePath(voice);
   return promptExists(relativePath) ? loadPrompt(relativePath) : null;
 }
 

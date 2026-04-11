@@ -26,7 +26,7 @@
 #### Voices
 - `prompts/voices/accessibility.md` — accessibility-focused rewrite rules
 - `prompts/voices/brand.md` — brand-voice rewrite rules
-- `prompts/voices/email.md` — email rewrite rules
+- `prompts/voices/commercial-email.md` — commercial email rewrite rules (voice id `email`)
 - `prompts/voices/executive.md` — executive-summary rewrite rules
 - `prompts/voices/journalist.md` — journalist-style rewrite rules
 - `prompts/voices/personal.md` — personal voice rewrite rules

@@ -14,6 +14,15 @@ function stripFrontmatter(content: string): string {
   return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n?/, "").trim();
 }
 
+/** Voice id (e.g. ToneVoice) → bundled path under `prompts/`. Default is `voices/${voice}.md`. */
+const VOICE_PROMPT_RELATIVE_PATH: Partial<Record<string, string>> = {
+  email: "voices/commercial-email.md",
+};
+
+export function voicePromptRelativePath(voice: string): string {
+  return VOICE_PROMPT_RELATIVE_PATH[voice] ?? `voices/${voice}.md`;
+}
+
 export function promptExists(relativePath: string): boolean {
   return existsSync(join(LOCAL_OVERRIDE_DIR, relativePath)) || existsSync(join(PROMPTS_DIR, relativePath));
 }

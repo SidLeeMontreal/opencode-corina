@@ -124,7 +124,7 @@ When async job execution is added:
 
 | Suite | Command | Count | When to run |
 |---|---|---|---|
-| Unit tests | `npm run test:unit` | 53 | Every commit |
+| Unit tests | `npm run test:unit` | 55 | Every commit |
 | Tier 1 eval | `npm run eval:tier1` | 22 | Every commit |
 | Integration | `npm run test:integration` | 16 | Before releases |
 | Tier 2 eval | `npm run eval:tier2` | — | Before releases (slow) |

@@ -8,7 +8,7 @@ import { buildEvaluationContextFromWorkflowState, selectModules } from "./evalua
 import { buildEvaluationContextBlock, normalizeBlankLines, runEvaluationAgent } from "./evaluation-runtime.js";
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { DEFAULT_MODEL_CONFIG } from "./model-config.js";
-import { loadPrompt } from "./prompt-loader.js";
+import { loadPrompt, voicePromptRelativePath } from "./prompt-loader.js";
 import { runBriefIntake, runCritique, runDraft, runOutline, runRevise } from "./steps.js";
 import { inferVoice } from "./tone-defaults.js";
 import type { AgentCapabilityOutput, AuditArtifact, EvaluationFinding, EvaluationModuleId, ModuleRunStatus, OpenCodeClient, PipelineModelConfig, WorkflowState } from "./types.js";
@@ -344,7 +344,7 @@ export async function runPipelineWithArtifact(
     );
     state.draftArtifact = draftResult.artifact;
     state.requested_voice = inferVoice(state.draftArtifact.content);
-    state.voice_prompt = state.requested_voice ? loadPrompt(`voices/${state.requested_voice}.md`) : undefined;
+    state.voice_prompt = state.requested_voice ? loadPrompt(voicePromptRelativePath(state.requested_voice)) : undefined;
     state.warnings.push(...(draftResult.warnings ?? []));
 
     const draftValidation = validate("DraftArtifact", state.draftArtifact);

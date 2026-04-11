@@ -1,5 +1,5 @@
 ---
-id: email
+id: commercial-email
 status: active
 version: 1.0.0
 owner: corina
