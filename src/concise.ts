@@ -1,4 +1,5 @@
 import { createCapabilityOutput } from "./capability-output.js";
+import { writeCapabilityAudit } from "./audit-log.js";
 import {
   addLlmMetrics,
   createUsageAccumulator,
@@ -947,6 +948,10 @@ function finalizeOutput(
   });
 }
 
+function buildCapabilityInputSummary(wordCount: number, mode: "quick" | "full"): string {
+  return `Concise input provided (${wordCount} words, mode=${mode}).`;
+}
+
 export async function runConciseWithArtifact(
   args: ConciseArgs,
   client: OpenCodeClient,
@@ -961,15 +966,37 @@ export async function runConciseWithArtifact(
     mode,
     input_word_count: countWords(args.text),
     target_words: args.target_words ?? null,
+    input_summary: buildCapabilityInputSummary(countWords(args.text), mode),
   });
 
   try {
-    if (mode === "quick") {
-      return await runQuickMode(args, client, logger, startMs, usage);
-    }
+    const output = mode === "quick"
+      ? await runQuickMode(args, client, logger, startMs, usage)
+      : await runFullMode(args, client, logger, startMs, usage);
 
-    return await runFullMode(args, client, logger, startMs, usage);
+    writeCapabilityAudit({
+      capability: "concise",
+      mode,
+      input_summary: buildCapabilityInputSummary(countWords(args.text), mode),
+      outcome: output.assumptions?.length ? "degraded" : "success",
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: output.assumptions?.length ?? 0,
+    });
+
+    return output;
   } catch (error) {
+    writeCapabilityAudit({
+      capability: "concise",
+      mode,
+      input_summary: buildCapabilityInputSummary(countWords(args.text), mode),
+      outcome: "failed",
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: 0,
+    });
     logger.error("capability_error", {
       capability: "concise",
       mode,

@@ -18,26 +18,26 @@ function resolveAuditLogPath(): string {
   return join(dataRoot, "opencode", "corina-audit.jsonl");
 }
 
-const auditLogPath = resolveAuditLogPath();
+let ensuredAuditDir: string | null = null;
 
-let auditDirEnsured = false;
-
-function ensureAuditDirOnce(): void {
-  if (auditDirEnsured) {
+function ensureAuditDirOnce(auditLogPath: string): void {
+  const targetDir = dirname(auditLogPath);
+  if (ensuredAuditDir === targetDir) {
     return;
   }
-  mkdirSync(dirname(auditLogPath), { recursive: true });
-  auditDirEnsured = true;
+  mkdirSync(targetDir, { recursive: true });
+  ensuredAuditDir = targetDir;
 }
 
 /** Serializes appends so JSONL line order matches invocation order under concurrent hooks. */
 let appendQueue: Promise<void> = Promise.resolve();
 
 export function writeAuditLog(entry: AuditLogEntry): void {
+  const auditLogPath = resolveAuditLogPath();
   const line = `${JSON.stringify(entry)}\n`;
   appendQueue = appendQueue.then(async () => {
     try {
-      ensureAuditDirOnce();
+      ensureAuditDirOnce(auditLogPath);
       await appendFile(auditLogPath, line, "utf8");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -51,4 +51,49 @@ export async function flushAuditLogs(): Promise<void> {
   await appendQueue;
 }
 
-export { auditLogPath };
+function timestampedAuditEntry(entry: Omit<AuditLogEntry, "timestamp">): AuditLogEntry {
+  return {
+    timestamp: new Date().toISOString(),
+    ...entry,
+  };
+}
+
+export function writeCapabilityAudit(input: {
+  capability: string;
+  mode?: string;
+  session_id?: string;
+  input_summary?: string;
+  outcome: "success" | "degraded" | "failed";
+  duration_ms?: number;
+  total_tokens?: number;
+  total_cost?: number;
+  assumptions_count?: number;
+}): void {
+  writeAuditLog(
+    timestampedAuditEntry({
+      event: "capability_complete",
+      ...input,
+    }),
+  );
+}
+
+export function writeChainAudit(input: {
+  capability: string;
+  mode?: string;
+  session_id?: string;
+  chain_target: string;
+  outcome: "success" | "degraded" | "failed";
+  duration_ms?: number;
+  total_tokens?: number;
+  total_cost?: number;
+  assumptions_count?: number;
+}): void {
+  writeAuditLog(
+    timestampedAuditEntry({
+      event: "chain_complete",
+      ...input,
+    }),
+  );
+}
+
+export { resolveAuditLogPath };

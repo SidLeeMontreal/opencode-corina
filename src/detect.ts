@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { AI_PATTERN_MAP, detectAiPatterns, type Layer1Scan, type PatternMatch } from "opencode-text-tools";
 
+import { writeCapabilityAudit } from "./audit-log.js";
 import { createCapabilityOutput } from "./capability-output.js";
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { formatInline, formatJson, formatReport } from "./detect-formatters.js";
@@ -253,6 +254,10 @@ function buildInputSummary(resolved: ResolvedInput, report: DetectionReport): st
   return `Analyzed ${source} (${report.input.word_count} words, ${report.patterns_found.length} findings).`;
 }
 
+function buildCapabilityInputSummary(wordCount: number, sourceType: ResolvedInput["sourceType"]): string {
+  return `Detection input provided (${wordCount} words, source=${sourceType}).`;
+}
+
 export interface DetectInput {
   text: string;
   format?: "inline" | "report" | "json";
@@ -276,20 +281,30 @@ export async function runDetectWithArtifact(
     capability: "detect",
     input_word_count: countWords(text),
     model_preset: input.modelPreset ?? null,
-    input_summary: text.slice(0, 160),
+    input_summary: buildCapabilityInputSummary(countWords(text), resolved.sourceType),
   });
 
   if (!text) {
     const report = emptyReport(resolved);
+    const durationMs = Date.now() - startMs;
     logger.warn("capability_complete", {
       capability: "detect",
-      duration_ms: Date.now() - startMs,
+      duration_ms: durationMs,
       word_count: 0,
       assumptions_count: report.assumptions.length,
       total_tokens: 0,
       total_cost: 0,
       pass: true,
       outcome: "degraded",
+    });
+    writeCapabilityAudit({
+      capability: "detect",
+      input_summary: buildCapabilityInputSummary(0, resolved.sourceType),
+      outcome: "degraded",
+      duration_ms: durationMs,
+      total_tokens: 0,
+      total_cost: 0,
+      assumptions_count: report.assumptions.length,
     });
     return createCapabilityOutput({
       capability: "detect",
@@ -301,21 +316,22 @@ export async function runDetectWithArtifact(
     });
   }
 
-  const layer1StartMs = Date.now();
-  const layer1Scan = detectAiPatterns(text);
-  const occurrenceMap = buildOccurrenceMap(text, layer1Scan.patternMatches.map((match) => match.matchedText));
-  const layer1Findings = layer1Scan.patternMatches.map((match) => buildFinding(text, match, layer1Scan, occurrenceMap));
-  logger.info("layer1_complete", { capability: "detect", pattern_count: layer1Findings.length, duration_ms: Date.now() - layer1StartMs });
-  const layer2StartMs = Date.now();
-  const layer2 = await runLayer2Analysis(text, layer1Scan, client, input.modelPreset, logger, usage);
-  const findings = mergeLayer2Findings(text, layer1Findings, layer2);
-  const baseScore = scoreFindings(findings);
-  const overallScore = applyLayer2Adjustment(baseScore, layer2.score_adjustment);
-  const verdict = verdictFromScore(overallScore);
+  try {
+    const layer1StartMs = Date.now();
+    const layer1Scan = detectAiPatterns(text);
+    const occurrenceMap = buildOccurrenceMap(text, layer1Scan.patternMatches.map((match) => match.matchedText));
+    const layer1Findings = layer1Scan.patternMatches.map((match) => buildFinding(text, match, layer1Scan, occurrenceMap));
+    logger.info("layer1_complete", { capability: "detect", pattern_count: layer1Findings.length, duration_ms: Date.now() - layer1StartMs });
+    const layer2StartMs = Date.now();
+    const layer2 = await runLayer2Analysis(text, layer1Scan, client, input.modelPreset, logger, usage);
+    const findings = mergeLayer2Findings(text, layer1Findings, layer2);
+    const baseScore = scoreFindings(findings);
+    const overallScore = applyLayer2Adjustment(baseScore, layer2.score_adjustment);
+    const verdict = verdictFromScore(overallScore);
 
-  logger.info("layer2_complete", { capability: "detect", verdict: verdictFromScore(applyLayer2Adjustment(scoreFindings(layer1Findings), layer2.score_adjustment)), score: applyLayer2Adjustment(scoreFindings(layer1Findings), layer2.score_adjustment), duration_ms: Date.now() - layer2StartMs, ran: layer2.ran });
+    logger.info("layer2_complete", { capability: "detect", verdict: verdictFromScore(applyLayer2Adjustment(scoreFindings(layer1Findings), layer2.score_adjustment)), score: applyLayer2Adjustment(scoreFindings(layer1Findings), layer2.score_adjustment), duration_ms: Date.now() - layer2StartMs, ran: layer2.ran });
 
-  const report: DetectionReport = {
+    const report: DetectionReport = {
     overall_score: overallScore,
     confidence: confidenceFromScore(overallScore, findings.length),
     verdict,
@@ -345,17 +361,17 @@ export async function runDetectWithArtifact(
     ],
   };
 
-  const validation = validate("DetectionReport", report);
-  if (!validation.valid) {
-    report.assumptions.push(`DetectionReport validation warning: ${validation.errors.join("; ")}`);
-  }
+    const validation = validate("DetectionReport", report);
+    if (!validation.valid) {
+      report.assumptions.push(`DetectionReport validation warning: ${validation.errors.join("; ")}`);
+    }
 
-  let rendered = formatOutput(text, report, input.format);
-  let chainedTo: string | undefined;
-  let chainResult: unknown;
-  const assumptions = [...report.assumptions];
+    let rendered = formatOutput(text, report, input.format);
+    let chainedTo: string | undefined;
+    let chainResult: unknown;
+    const assumptions = [...report.assumptions];
 
-  if (input.autoFix) {
+    if (input.autoFix) {
     logger.info("chain_start", { capability: "detect", chain_target: "tone" });
     const fixed = await runTonePipelineWithArtifact(
       {
@@ -372,9 +388,9 @@ export async function runDetectWithArtifact(
     chainResult = fixed.artifact;
     assumptions.push("Auto-fix rewrite appended using Corina tone capability.");
     logger.info("chain_complete", { capability: "detect", chain_target: "tone", outcome: "success" });
-  }
+    }
 
-  if (input.chain === "pipeline") {
+    if (input.chain === "pipeline") {
     logger.info("chain_start", { capability: "detect", chain_target: "pipeline" });
     const fixed = await runPipelineWithArtifact(
       `Rewrite this text to remove AI writing patterns:\n\n${text}`,
@@ -387,31 +403,60 @@ export async function runDetectWithArtifact(
     chainResult = fixed.artifact;
     assumptions.push("Pipeline rewrite appended because detect was chained to pipeline.");
     logger.info("chain_complete", { capability: "detect", chain_target: "pipeline", outcome: "success" });
-  }
+    }
 
-  logger.info("capability_complete", {
-    capability: "detect",
-    duration_ms: Date.now() - startMs,
-    word_count: report.input.word_count,
-    assumptions_count: assumptions.length,
-    total_tokens: usage.total_tokens,
-    total_cost: usage.total_cost,
-    pass: report.verdict !== "likely_ai",
-    outcome: chainResult ? "degraded" : "success",
-  });
-
-  return {
-    ...createCapabilityOutput({
+    const durationMs = Date.now() - startMs;
+    const outcome = chainResult || report.verdict === "likely_ai" ? "degraded" : "success";
+    logger.info("capability_complete", {
       capability: "detect",
-      inputSummary: buildInputSummary(resolved, report),
-      artifact: report,
-      rendered,
-      chainedTo,
-      assumptions,
-      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
-    }),
-    ...(chainResult ? { chain_result: chainResult } : {}),
-  };
+      duration_ms: durationMs,
+      word_count: report.input.word_count,
+      assumptions_count: assumptions.length,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      pass: report.verdict !== "likely_ai",
+      outcome,
+    });
+
+    writeCapabilityAudit({
+      capability: "detect",
+      input_summary: buildCapabilityInputSummary(report.input.word_count, resolved.sourceType),
+      outcome,
+      duration_ms: durationMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: assumptions.length,
+    });
+
+    return {
+      ...createCapabilityOutput({
+        capability: "detect",
+        inputSummary: buildInputSummary(resolved, report),
+        artifact: report,
+        rendered,
+        chainedTo,
+        assumptions,
+        metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+      }),
+      ...(chainResult ? { chain_result: chainResult } : {}),
+    };
+  } catch (error) {
+    writeCapabilityAudit({
+      capability: "detect",
+      input_summary: buildCapabilityInputSummary(countWords(text), resolved.sourceType),
+      outcome: "failed",
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: 0,
+    });
+    logger.error("capability_error", {
+      capability: "detect",
+      degraded: false,
+      ...errorDetails(error),
+    });
+    throw error;
+  }
 }
 
 export async function runDetect(input: DetectInput, client: OpenCodeClient, logger?: AgentLogger): Promise<string> {

@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createCapabilityOutput } from "./capability-output.js";
+import { writeCapabilityAudit } from "./audit-log.js";
 import {
   addLlmMetrics,
   createUsageAccumulator,
@@ -519,6 +520,10 @@ function buildInputSummary(inputArtifact: ToneInputArtifact): string {
   return `Rewrote ${source} in ${inputArtifact.voice} voice for ${inputArtifact.format} format (${words} words).`;
 }
 
+function buildCapabilityInputSummary(wordCount: number, voice?: string, format?: string): string {
+  return `Tone input provided (${wordCount} words, voice=${voice ?? "auto"}, format=${format ?? "auto"}).`;
+}
+
 export async function runTonePipelineWithArtifact(
   input: ToneRawInput,
   client: OpenCodeClient,
@@ -534,7 +539,7 @@ export async function runTonePipelineWithArtifact(
     capability: "tone",
     input_word_count: countWords(originalText),
     model_preset: input.modelPreset ?? null,
-    input_summary: originalText.slice(0, 160),
+    input_summary: buildCapabilityInputSummary(countWords(originalText), input.voice?.trim(), input.format?.trim()),
   });
 
   if (!originalText) {
@@ -551,15 +556,26 @@ export async function runTonePipelineWithArtifact(
       validation_score: 100,
     };
 
+    const durationMs = Date.now() - startMs;
     logger.warn("capability_complete", {
       capability: "tone",
-      duration_ms: Date.now() - startMs,
+      duration_ms: durationMs,
       word_count: countWords(emptyOutput.final_content),
       assumptions_count: emptyOutput.assumptions.length,
       total_tokens: 0,
       total_cost: 0,
       pass: true,
       outcome: "degraded",
+    });
+
+    writeCapabilityAudit({
+      capability: "tone",
+      input_summary: buildCapabilityInputSummary(0, input.voice?.trim(), input.format?.trim()),
+      outcome: "degraded",
+      duration_ms: durationMs,
+      total_tokens: 0,
+      total_cost: 0,
+      assumptions_count: emptyOutput.assumptions.length,
     });
 
     return createCapabilityOutput({
@@ -573,25 +589,27 @@ export async function runTonePipelineWithArtifact(
   }
 
   let voice = (input.voice?.trim() as ToneVoice | undefined) ?? inferVoice(originalText);
-  if (!input.voice?.trim()) {
-    assumptions.push(`Voice inferred as ${voice}.`);
-  }
-
   let format = (input.format?.trim() as ToneFormat | undefined) ?? inferFormat(originalText);
-  if (!input.format?.trim()) {
-    assumptions.push(`Format inferred as ${format}.`);
-  }
-
   let audience = input.audience?.trim() || inferAudience(voice);
-  if (!input.audience?.trim() && audience) {
-    assumptions.push(`Audience defaulted to ${audience}.`);
-  }
 
-  let brandProfile: BrandProfile | null = null;
-  let toneDescription: string | null = null;
-  let personalToneProfile: PersonalVoiceProfile | null = null;
+  try {
+    if (!input.voice?.trim()) {
+      assumptions.push(`Voice inferred as ${voice}.`);
+    }
 
-  if (voice === "brand") {
+    if (!input.format?.trim()) {
+      assumptions.push(`Format inferred as ${format}.`);
+    }
+
+    if (!input.audience?.trim() && audience) {
+      assumptions.push(`Audience defaulted to ${audience}.`);
+    }
+
+    let brandProfile: BrandProfile | null = null;
+    let toneDescription: string | null = null;
+    let personalToneProfile: PersonalVoiceProfile | null = null;
+
+    if (voice === "brand") {
     if (input.toneDesc || input.toneFile) {
       assumptions.push("Ignored personal tone inputs because brand voice was requested.");
     }
@@ -612,9 +630,9 @@ export async function runTonePipelineWithArtifact(
       });
       voice = "persuasive";
     }
-  }
+    }
 
-  if (voice === "personal") {
+    if (voice === "personal") {
     if (input.profile) {
       assumptions.push("Ignored --profile because personal voice was requested.");
     }
@@ -622,11 +640,11 @@ export async function runTonePipelineWithArtifact(
     assumptions.push(...loaded.assumptions);
     toneDescription = loaded.toneDescription;
     personalToneProfile = buildPersonalVoiceProfile(toneDescription ?? "");
-  } else if (input.toneDesc || input.toneFile) {
-    assumptions.push("Ignored personal tone inputs because personal voice was not requested.");
-  }
+    } else if (input.toneDesc || input.toneFile) {
+      assumptions.push("Ignored personal tone inputs because personal voice was not requested.");
+    }
 
-  const inputArtifact: ToneInputArtifact = {
+    const inputArtifact: ToneInputArtifact = {
     original_text: originalText,
     source_path: sourcePath,
     voice,
@@ -648,31 +666,31 @@ export async function runTonePipelineWithArtifact(
     },
   };
 
-  const inputValidation = validate("ToneInputArtifact", inputArtifact);
-  if (!inputValidation.valid) {
-    assumptions.push(`ToneInputArtifact validation warning: ${inputValidation.errors.join("; ")}`);
-  }
+    const inputValidation = validate("ToneInputArtifact", inputArtifact);
+    if (!inputValidation.valid) {
+      assumptions.push(`ToneInputArtifact validation warning: ${inputValidation.errors.join("; ")}`);
+    }
 
-  const voiceProfileRelativePath = `voices/${voice}.md`;
-  const voiceProfile = promptExists(voiceProfileRelativePath)
-    ? loadPrompt(voiceProfileRelativePath)
-    : `Voice profile missing for ${voice}. Preserve facts. Produce usable output.`;
+    const voiceProfileRelativePath = `voices/${voice}.md`;
+    const voiceProfile = promptExists(voiceProfileRelativePath)
+      ? loadPrompt(voiceProfileRelativePath)
+      : `Voice profile missing for ${voice}. Preserve facts. Produce usable output.`;
 
-  const firstPassInstructions = input.fixInstructions?.length ? input.fixInstructions : undefined;
-  const firstPass = await runWriter(client, inputArtifact, voiceProfile, firstPassInstructions, logger, usage);
-  let rewrittenContent = firstPass.rewrittenContent || originalText;
-  assumptions.push(...firstPass.assumptions);
+    const firstPassInstructions = input.fixInstructions?.length ? input.fixInstructions : undefined;
+    const firstPass = await runWriter(client, inputArtifact, voiceProfile, firstPassInstructions, logger, usage);
+    let rewrittenContent = firstPass.rewrittenContent || originalText;
+    assumptions.push(...firstPass.assumptions);
 
-  logger.info("rewrite_complete", {
+    logger.info("rewrite_complete", {
     capability: "tone",
     voice_applied: voice,
     word_count: countWords(rewrittenContent),
   });
 
-  let retryCount = 0;
-  let validator = await runValidator(client, originalText, rewrittenContent, voice, format, logger, usage);
+    let retryCount = 0;
+    let validator = await runValidator(client, originalText, rewrittenContent, voice, format, logger, usage);
 
-  if (!validator.pass && validator.correction_instructions.length > 0) {
+    if (!validator.pass && validator.correction_instructions.length > 0) {
     retryCount = 1;
     assumptions.push("Validator requested one targeted correction pass.");
     const fixPass = await runWriter(client, inputArtifact, voiceProfile, validator.correction_instructions, logger, usage);
@@ -685,43 +703,75 @@ export async function runTonePipelineWithArtifact(
       retry_count: retryCount,
     });
     validator = await runValidator(client, originalText, rewrittenContent, voice, format, logger, usage);
-  }
+    }
 
-  logger.info("validation_complete", {
+    logger.info("validation_complete", {
     capability: "tone",
     pass: validator.pass,
     retry_count: retryCount,
     validation_score: validator.validation_score,
   });
 
-  const outputArtifact = makeToneOutputArtifact(rewrittenContent, voice, format, assumptions, validator, originalText);
-  const outputValidation = validate("ToneOutputArtifact", outputArtifact);
-  if (!outputValidation.valid) {
-    outputArtifact.validator_notes = [
-      ...outputArtifact.validator_notes,
-      `ToneOutputArtifact validation warning: ${outputValidation.errors.join("; ")}`,
-    ];
+    const outputArtifact = makeToneOutputArtifact(rewrittenContent, voice, format, assumptions, validator, originalText);
+    const outputValidation = validate("ToneOutputArtifact", outputArtifact);
+    if (!outputValidation.valid) {
+      outputArtifact.validator_notes = [
+        ...outputArtifact.validator_notes,
+        `ToneOutputArtifact validation warning: ${outputValidation.errors.join("; ")}`,
+      ];
+    }
+
+    const durationMs = Date.now() - startMs;
+    const outcome = validator.pass ? "success" : "degraded";
+    logger.info("capability_complete", {
+      capability: "tone",
+      duration_ms: durationMs,
+      word_count: countWords(outputArtifact.final_content),
+      assumptions_count: outputArtifact.assumptions.length,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      pass: validator.pass,
+      outcome,
+    });
+
+    writeCapabilityAudit({
+      capability: "tone",
+      mode: voice,
+      input_summary: buildCapabilityInputSummary(countWords(originalText), voice, format),
+      outcome,
+      duration_ms: durationMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: outputArtifact.assumptions.length,
+    });
+
+    return createCapabilityOutput({
+      capability: "tone",
+      inputSummary: buildInputSummary(inputArtifact),
+      artifact: outputArtifact,
+      rendered: outputArtifact.final_content,
+      assumptions: outputArtifact.assumptions,
+      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+    });
+  } catch (error) {
+    writeCapabilityAudit({
+      capability: "tone",
+      mode: voice,
+      input_summary: buildCapabilityInputSummary(countWords(originalText), voice, format),
+      outcome: "failed",
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: assumptions.length,
+    });
+    logger.error("capability_error", {
+      capability: "tone",
+      mode: voice,
+      degraded: false,
+      ...errorDetails(error),
+    });
+    throw error;
   }
-
-  logger.info("capability_complete", {
-    capability: "tone",
-    duration_ms: Date.now() - startMs,
-    word_count: countWords(outputArtifact.final_content),
-    assumptions_count: outputArtifact.assumptions.length,
-    total_tokens: usage.total_tokens,
-    total_cost: usage.total_cost,
-    pass: validator.pass,
-    outcome: validator.pass ? "success" : "degraded",
-  });
-
-  return createCapabilityOutput({
-    capability: "tone",
-    inputSummary: buildInputSummary(inputArtifact),
-    artifact: outputArtifact,
-    rendered: outputArtifact.final_content,
-    assumptions: outputArtifact.assumptions,
-    metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
-  });
 }
 
 export async function runTonePipeline(input: ToneRawInput, client: OpenCodeClient, logger?: AgentLogger): Promise<string> {

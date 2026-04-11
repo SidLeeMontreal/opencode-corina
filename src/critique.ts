@@ -6,6 +6,7 @@ import { ModelResolver } from "opencode-model-resolver";
 import type { ResolvedModel } from "opencode-model-resolver";
 import { detectAiPatterns } from "opencode-text-tools";
 
+import { writeCapabilityAudit, writeChainAudit } from "./audit-log.js";
 import { createCapabilityOutput } from "./capability-output.js";
 import {
   addLlmMetrics,
@@ -286,6 +287,37 @@ function buildEmptyRubricReport(rubric: ResolvedRubric | undefined, assumptions:
 
 function buildInputSummary(count: number, mode: CritiqueMode): string {
   return `Critiqued ${count} input${count === 1 ? "" : "s"} in ${mode} mode.`;
+}
+
+function buildCapabilityInputSummary(mode: CritiqueMode, inputCount: number, audience?: string | null): string {
+  const audiencePart = mode === "audience" && audience ? `, audience=${audience}` : "";
+  return `Critique input provided (mode=${mode}, inputs=${inputCount}${audiencePart}).`;
+}
+
+function inferCritiqueOutcome(output: AgentCapabilityOutput<CritiqueArtifactUnion>): "success" | "degraded" {
+  const artifact = output.artifact as unknown as Record<string, unknown>;
+  if (artifact["status"] === "degraded" || artifact["status"] === "no_input" || artifact["degraded"] === true) {
+    return "degraded";
+  }
+
+  return "success";
+}
+
+function inferChainOutcome(output: AgentCapabilityOutput<unknown>): "success" | "degraded" {
+  const artifact = output.artifact as Record<string, unknown> | undefined;
+  if (!artifact) {
+    return Array.isArray(output.assumptions) && output.assumptions.length > 0 ? "degraded" : "success";
+  }
+
+  if (artifact["status"] === "degraded" || artifact["status"] === "no_input" || artifact["degraded"] === true) {
+    return "degraded";
+  }
+
+  if (artifact["approved_for_delivery"] === false || artifact["verdict"] === "likely_ai") {
+    return "degraded";
+  }
+
+  return "success";
 }
 
 function errorMessage(error: unknown): string {
@@ -643,54 +675,96 @@ export async function executeChain(
   }
 
   let chainResult: AgentCapabilityOutput<unknown>;
+  const chainStartMs = Date.now();
 
   logger.info("chain_start", { capability: "critique", chain_target: chain, mode: critiqueOutput.mode });
 
-  if (chain === "tone") {
-    const toneInput = buildToneChainInput(critiqueOutput, options);
-    chainResult = await runTonePipelineWithArtifact(
-      {
-        text: toneInput.text,
-        voice: toneInput.voice,
-        modelPreset: options.modelPreset,
-        fixInstructions: toneInput.fixInstructions,
-        preservationInstructions: toneInput.preservationInstructions,
-      },
-      client,
-      logger,
-    );
-  } else if (chain === "detect") {
-    chainResult = await runDetectWithArtifact({ text, format: "report", modelPreset: options.modelPreset }, client, logger);
-  } else if (critiqueOutput.mode === "quality") {
-    chainResult = await runPipelineWithArtifact(buildBriefFromCritique(text, critiqueOutput.artifact as CritiqueReport), client, undefined, logger);
-  } else {
-    const guidance = critiqueOutput.mode === "audience"
-      ? (critiqueOutput.artifact as AudienceCritiqueReport).rewrite_brief
-      : critiqueOutput.mode === "rubric"
-        ? collectRubricFixes(critiqueOutput.artifact as RubricReport)
-        : [(critiqueOutput.artifact as ComparisonReport).recommendation_reason];
-    chainResult = await runPipelineWithArtifact(
-      [
-        "Revise the following text so it resolves the supplied critique guidance.",
-        "",
-        "TEXT:",
-        text,
-        "",
-        "GUIDANCE:",
-        ...guidance.map((item, index) => `${index + 1}. ${item}`),
-      ].join("\n"),
-      client,
-      undefined,
-      logger,
-    );
+  try {
+    if (chain === "tone") {
+      const toneInput = buildToneChainInput(critiqueOutput, options);
+      chainResult = await runTonePipelineWithArtifact(
+        {
+          text: toneInput.text,
+          voice: toneInput.voice,
+          modelPreset: options.modelPreset,
+          fixInstructions: toneInput.fixInstructions,
+          preservationInstructions: toneInput.preservationInstructions,
+        },
+        client,
+        logger,
+      );
+    } else if (chain === "detect") {
+      chainResult = await runDetectWithArtifact({ text, format: "report", modelPreset: options.modelPreset }, client, logger);
+    } else if (critiqueOutput.mode === "quality") {
+      chainResult = await runPipelineWithArtifact(buildBriefFromCritique(text, critiqueOutput.artifact as CritiqueReport), client, undefined, logger);
+    } else {
+      const guidance = critiqueOutput.mode === "audience"
+        ? (critiqueOutput.artifact as AudienceCritiqueReport).rewrite_brief
+        : critiqueOutput.mode === "rubric"
+          ? collectRubricFixes(critiqueOutput.artifact as RubricReport)
+          : [(critiqueOutput.artifact as ComparisonReport).recommendation_reason];
+      chainResult = await runPipelineWithArtifact(
+        [
+          "Revise the following text so it resolves the supplied critique guidance.",
+          "",
+          "TEXT:",
+          text,
+          "",
+          "GUIDANCE:",
+          ...guidance.map((item, index) => `${index + 1}. ${item}`),
+        ].join("\n"),
+        client,
+        undefined,
+        logger,
+      );
+    }
+
+    const chainMetrics = (chainResult as AgentCapabilityOutput<unknown> & { metrics?: { total_tokens?: number; total_cost?: number } }).metrics ?? {};
+    const chainAssumptions = Array.isArray(chainResult.assumptions) ? chainResult.assumptions.length : 0;
+    const chainOutcome = inferChainOutcome(chainResult);
+    logger.info("chain_complete", {
+      capability: "critique",
+      chain_target: chain,
+      outcome: chainOutcome,
+      mode: critiqueOutput.mode,
+      duration_ms: Date.now() - chainStartMs,
+      total_tokens: chainMetrics.total_tokens,
+      total_cost: chainMetrics.total_cost,
+      assumptions_count: chainAssumptions,
+    });
+    writeChainAudit({
+      capability: "critique",
+      mode: critiqueOutput.mode,
+      chain_target: chain,
+      outcome: chainOutcome,
+      duration_ms: Date.now() - chainStartMs,
+      total_tokens: chainMetrics.total_tokens,
+      total_cost: chainMetrics.total_cost,
+      assumptions_count: chainAssumptions,
+    });
+
+    return {
+      chainResult,
+      appendedRendered: `Chain result (${chain})\n-------------------\n${chainResult.rendered}`,
+    };
+  } catch (error) {
+    logger.error("chain_complete", {
+      capability: "critique",
+      chain_target: chain,
+      outcome: "failed",
+      mode: critiqueOutput.mode,
+      duration_ms: Date.now() - chainStartMs,
+      ...errorDetails(error),
+    });
+    writeChainAudit({
+      capability: "critique",
+      mode: critiqueOutput.mode,
+      chain_target: chain,
+      outcome: "failed",
+      duration_ms: Date.now() - chainStartMs,
+    });
+    throw error;
   }
-
-  logger.info("chain_complete", { capability: "critique", chain_target: chain, outcome: "success", mode: critiqueOutput.mode });
-
-  return {
-    chainResult,
-    appendedRendered: `Chain result (${chain})\n-------------------\n${chainResult.rendered}`,
-  };
 }
 
 async function finalizeOutput(
@@ -708,7 +782,7 @@ async function finalizeOutput(
 
   if (!options.chain) {
     logger.info("critique_complete", { capability: "critique", mode: finalized.mode, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost });
-    logger.info("capability_complete", { capability: "critique", mode: finalized.mode, duration_ms: Date.now() - startMs, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: "success" });
+    logger.info("capability_complete", { capability: "critique", mode: finalized.mode, duration_ms: Date.now() - startMs, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: inferCritiqueOutcome(finalized) });
     return finalized;
   }
 
@@ -721,7 +795,7 @@ async function finalizeOutput(
   };
 
   logger.info("critique_complete", { capability: "critique", mode: finalized.mode, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost });
-  logger.info("capability_complete", { capability: "critique", mode: finalized.mode, duration_ms: Date.now() - startMs, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: "success", chain_target: options.chain });
+  logger.info("capability_complete", { capability: "critique", mode: finalized.mode, duration_ms: Date.now() - startMs, assumptions_count: finalized.assumptions?.length ?? 0, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: inferCritiqueOutcome(finalized), chain_target: options.chain });
 
   return finalized;
 }
@@ -816,8 +890,9 @@ async function runModularCritique(
   const moduleResults = await Promise.all(
     evaluatorModules.map(async (module) => {
       const config = MODULE_PROMPTS[module.id as keyof typeof MODULE_PROMPTS];
+      const moduleStartMs = Date.now();
       try {
-        logger.debug("capability_start", { capability: "critique", step: module.id, module_id: module.id });
+        logger.debug("step_start", { capability: "critique", step: module.id, module_id: module.id, model_id: model?.modelID });
         const result = await runEvaluationAgent({
           client,
           capability: "critique",
@@ -850,16 +925,28 @@ async function runModularCritique(
           module.id,
         );
         module_status[module.id] = normalized.status;
-        logger.info("module_complete", { capability: "critique", module_id: module.id, status: normalized.status, finding_count: normalized.findings.length });
+        logger.info("step_complete", {
+          capability: "critique",
+          step: module.id,
+          module_id: module.id,
+          duration_ms: Date.now() - moduleStartMs,
+          model_id: result.metrics.model_id ?? model?.modelID,
+          status: normalized.status,
+          finding_count: normalized.findings.length,
+          degraded: normalized.status === "degraded" ? true : undefined,
+        });
         return normalized;
       } catch (error) {
         module_status[module.id] = "degraded";
-        logger.warn("module_complete", {
+        logger.warn("step_complete", {
           capability: "critique",
+          step: module.id,
           module_id: module.id,
+          duration_ms: Date.now() - moduleStartMs,
+          model_id: model?.modelID,
           status: "degraded",
+          finding_count: 0,
           degraded: true,
-          message: errorMessage(error),
         });
         return normalizeModuleOutput(
           {
@@ -877,6 +964,8 @@ async function runModularCritique(
   );
 
   const findings = deduplicateFindings(moduleResults.flatMap((result) => result.findings));
+  const adjudicatorStartMs = Date.now();
+  logger.debug("step_start", { capability: "critique", step: "critic-adjudicator", module_id: "critic-adjudicator", model_id: model?.modelID });
   const adjudicatorResult = await runEvaluationAgent({
     client,
     capability: "critique",
@@ -896,6 +985,18 @@ async function runModularCritique(
     model,
     logger,
     usage,
+  });
+
+  logger.info("step_complete", {
+    capability: "critique",
+    step: "critic-adjudicator",
+    module_id: "critic-adjudicator",
+    duration_ms: Date.now() - adjudicatorStartMs,
+    model_id: adjudicatorResult.metrics.model_id ?? model?.modelID,
+    status: Object.values(module_status).includes("degraded") ? "degraded" : "ok",
+    finding_count: findings.length,
+    pass: Boolean((adjudicatorResult.raw as Partial<CritiqueArtifact>).pass),
+    degraded: Object.values(module_status).includes("degraded") ? true : undefined,
   });
 
   return {
@@ -1101,8 +1202,11 @@ export async function runCritiqueWithArtifact(
   const normalized = await normalizeCritiqueInputs(inputs, options);
   const assumptions = [...normalized.assumptions, ...normalized.warnings];
   const model = await resolveModel(options.modelPreset);
+  const capabilityInputSummary = buildCapabilityInputSummary(normalized.mode, normalized.items.length || inputs.length, options.audience ?? normalized.inferredAudience ?? null);
 
-  logger.info("capability_start", { capability: "critique", mode: normalized.mode, input_summary: inputs.join(" | ").slice(0, 160), model_preset: options.modelPreset ?? null, input_count: inputs.length });
+  logger.info("capability_start", { capability: "critique", mode: normalized.mode, input_summary: capabilityInputSummary, model_preset: options.modelPreset ?? null, input_count: inputs.length });
+
+  try {
 
   if (!normalized.items.length) {
     const mode = normalized.mode;
@@ -1124,7 +1228,18 @@ export async function runCritiqueWithArtifact(
       rendered: renderOutput(provisional as AgentCapabilityOutput<CritiqueArtifactUnion>, options.format),
     };
     logger.warn("critique_complete", { capability: "critique", mode, assumptions_count: assumptions.length, total_tokens: usage.total_tokens, total_cost: usage.total_cost });
-    logger.warn("capability_complete", { capability: "critique", mode, duration_ms: Date.now() - startMs, assumptions_count: assumptions.length, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: "degraded" });
+    const durationMs = Date.now() - startMs;
+    logger.warn("capability_complete", { capability: "critique", mode, duration_ms: durationMs, assumptions_count: assumptions.length, total_tokens: usage.total_tokens, total_cost: usage.total_cost, outcome: "degraded" });
+    writeCapabilityAudit({
+      capability: "critique",
+      mode,
+      input_summary: capabilityInputSummary,
+      outcome: "degraded",
+      duration_ms: durationMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: assumptions.length,
+    });
     return finalized;
   }
 
@@ -1140,7 +1255,7 @@ export async function runCritiqueWithArtifact(
 
     const validation = validate("CritiqueReport", artifact);
     if (!validation.valid) artifact.assumptions.push(`CritiqueReport validation warning: ${validation.errors.join("; ")}`);
-    return finalizeOutput(
+    const output = await finalizeOutput(
       createCapabilityOutput({
         capability: "critique",
         mode: normalized.mode,
@@ -1156,6 +1271,17 @@ export async function runCritiqueWithArtifact(
       usage,
       startMs,
     );
+    writeCapabilityAudit({
+      capability: "critique",
+      mode: normalized.mode,
+      input_summary: capabilityInputSummary,
+      outcome: inferCritiqueOutcome(output),
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: output.assumptions?.length ?? 0,
+    });
+    return output;
   }
 
   if (normalized.mode === "audience") {
@@ -1174,7 +1300,7 @@ export async function runCritiqueWithArtifact(
 
     const validation = validate("AudienceCritiqueReport", artifact);
     if (!validation.valid) artifact.assumptions.push(`AudienceCritiqueReport validation warning: ${validation.errors.join("; ")}`);
-    return finalizeOutput(
+    const output = await finalizeOutput(
       createCapabilityOutput({
         capability: "critique",
         mode: normalized.mode,
@@ -1190,6 +1316,17 @@ export async function runCritiqueWithArtifact(
       usage,
       startMs,
     );
+    writeCapabilityAudit({
+      capability: "critique",
+      mode: normalized.mode,
+      input_summary: capabilityInputSummary,
+      outcome: inferCritiqueOutcome(output),
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: output.assumptions?.length ?? 0,
+    });
+    return output;
   }
 
   if (normalized.mode === "rubric") {
@@ -1204,7 +1341,7 @@ export async function runCritiqueWithArtifact(
 
     const validation = validate("RubricReport", artifact);
     if (!validation.valid) artifact.assumptions.push(`RubricReport validation warning: ${validation.errors.join("; ")}`);
-    return finalizeOutput(
+    const output = await finalizeOutput(
       createCapabilityOutput({
         capability: "critique",
         mode: normalized.mode,
@@ -1220,6 +1357,17 @@ export async function runCritiqueWithArtifact(
       usage,
       startMs,
     );
+    writeCapabilityAudit({
+      capability: "critique",
+      mode: normalized.mode,
+      input_summary: capabilityInputSummary,
+      outcome: inferCritiqueOutcome(output),
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: output.assumptions?.length ?? 0,
+    });
+    return output;
   }
 
   const reports: Array<{
@@ -1254,7 +1402,7 @@ export async function runCritiqueWithArtifact(
 
   const validation = validate("ComparisonReport", artifact);
   if (!validation.valid) artifact.assumptions.push(`ComparisonReport validation warning: ${validation.errors.join("; ")}`);
-  return finalizeOutput(
+  const output = await finalizeOutput(
     createCapabilityOutput({
       capability: "critique",
       mode: normalized.mode,
@@ -1269,6 +1417,36 @@ export async function runCritiqueWithArtifact(
     usage,
     startMs,
   );
+  writeCapabilityAudit({
+    capability: "critique",
+    mode: normalized.mode,
+    input_summary: capabilityInputSummary,
+    outcome: inferCritiqueOutcome(output),
+    duration_ms: Date.now() - startMs,
+    total_tokens: usage.total_tokens,
+    total_cost: usage.total_cost,
+    assumptions_count: output.assumptions?.length ?? 0,
+  });
+  return output;
+  } catch (error) {
+    writeCapabilityAudit({
+      capability: "critique",
+      mode: normalized.mode,
+      input_summary: capabilityInputSummary,
+      outcome: "failed",
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: assumptions.length,
+    });
+    logger.error("capability_error", {
+      capability: "critique",
+      mode: normalized.mode,
+      degraded: false,
+      ...errorDetails(error),
+    });
+    throw error;
+  }
 }
 
 export async function runCritique(inputs: string[], options: RunCritiqueOptions, client: OpenCodeClient, logger?: AgentLogger): Promise<string> {

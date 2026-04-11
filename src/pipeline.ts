@@ -1,6 +1,7 @@
 import { ModelResolver } from "opencode-model-resolver";
 import type { ResolvedModel } from "opencode-model-resolver";
 
+import { writeCapabilityAudit } from "./audit-log.js";
 import { createCapabilityOutput } from "./capability-output.js";
 import { deduplicateFindings, normalizeModuleOutput } from "./evaluation-normalizer.js";
 import { buildEvaluationContextFromWorkflowState, selectModules } from "./evaluation-registry.js";
@@ -29,6 +30,10 @@ export function mergeModelConfig(modelConfig?: Partial<PipelineModelConfig>): Pi
 function buildInputSummary(brief: string, state: WorkflowState): string {
   const wordCount = brief.trim().split(/\s+/).filter(Boolean).length;
   return `Processed pipeline brief (${wordCount} words, ${state.critiquePasses || 0} critique passes).`;
+}
+
+function buildCapabilityInputSummary(wordCount: number): string {
+  return `Pipeline brief provided (${wordCount} words).`;
 }
 
 function buildFallbackAudit(note: string, finalContent: string | null = null): AuditArtifact {
@@ -94,8 +99,9 @@ async function runAuditV2(
   const moduleOutputs = await Promise.all(
     evaluatorModules.map(async (module) => {
       const config = AUDIT_MODULE_PROMPTS[module.id as keyof typeof AUDIT_MODULE_PROMPTS];
+      const moduleStartMs = Date.now();
       try {
-        logger.debug("capability_start", { capability: "pipeline", step: module.id, module_id: module.id });
+        logger.debug("step_start", { capability: "pipeline", step: module.id, module_id: module.id, model_id: model?.modelID });
         const result = await runEvaluationAgent({
           client,
           capability: "pipeline",
@@ -128,10 +134,29 @@ async function runAuditV2(
           module.id,
         );
         module_status[module.id] = normalized.status;
-        logger.info("module_complete", { capability: "pipeline", step: "audit", module_id: module.id, status: normalized.status, finding_count: normalized.findings.length });
+        logger.info("step_complete", {
+          capability: "pipeline",
+          step: module.id,
+          module_id: module.id,
+          duration_ms: Date.now() - moduleStartMs,
+          model_id: result.metrics.model_id ?? model?.modelID,
+          status: normalized.status,
+          finding_count: normalized.findings.length,
+          degraded: normalized.status === "degraded" ? true : undefined,
+        });
         return normalized;
       } catch (error) {
         module_status[module.id] = "degraded";
+        logger.warn("step_complete", {
+          capability: "pipeline",
+          step: module.id,
+          module_id: module.id,
+          duration_ms: Date.now() - moduleStartMs,
+          model_id: model?.modelID,
+          status: "degraded",
+          finding_count: 0,
+          degraded: true,
+        });
         return normalizeModuleOutput(
           {
             module_id: module.id,
@@ -148,6 +173,8 @@ async function runAuditV2(
   );
 
   const findings = deduplicateFindings(moduleOutputs.flatMap((output) => output.findings));
+  const adjudicatorStartMs = Date.now();
+  logger.debug("step_start", { capability: "pipeline", step: "auditor-adjudicator", module_id: "auditor-adjudicator", model_id: model?.modelID });
   const result = await runEvaluationAgent({
     client,
     capability: "pipeline",
@@ -167,6 +194,18 @@ async function runAuditV2(
     model,
     logger,
     usage,
+  });
+
+  logger.info("step_complete", {
+    capability: "pipeline",
+    step: "auditor-adjudicator",
+    module_id: "auditor-adjudicator",
+    duration_ms: Date.now() - adjudicatorStartMs,
+    model_id: result.metrics.model_id ?? model?.modelID,
+    status: Object.values(module_status).includes("degraded") ? "degraded" : "ok",
+    finding_count: findings.length,
+    pass: Boolean((result.raw as Partial<AuditArtifact>).approved_for_delivery),
+    degraded: Object.values(module_status).includes("degraded") ? true : undefined,
   });
 
   const rawArtifact = result.raw as Partial<AuditArtifact>;
@@ -221,7 +260,7 @@ export async function runPipelineWithArtifact(
     capability: "pipeline",
     input_word_count: inputWordCount,
     model_preset: config.briefIntake.preset ?? null,
-    input_summary: brief.slice(0, 160),
+    input_summary: buildCapabilityInputSummary(inputWordCount),
   });
 
   try {
@@ -251,6 +290,16 @@ export async function runPipelineWithArtifact(
         word_count: rendered.trim().split(/\s+/).filter(Boolean).length,
         assumptions_count: state.warnings.length,
         outcome: "degraded",
+      });
+
+      writeCapabilityAudit({
+        capability: "pipeline",
+        input_summary: buildCapabilityInputSummary(inputWordCount),
+        outcome: "degraded",
+        duration_ms: durationMs,
+        total_tokens: usage.total_tokens,
+        total_cost: usage.total_cost,
+        assumptions_count: state.warnings.length,
       });
 
       return createCapabilityOutput({
@@ -335,13 +384,17 @@ export async function runPipelineWithArtifact(
     }
 
     const auditModel = await resolver.resolveStepModel(config.audit, config.provider);
+    const auditStartMs = Date.now();
     logger.debug("step_start", { capability: "pipeline", step: "audit", model_id: auditModel.modelID });
     state.auditArtifact = await runAuditV2(client, state, auditModel, logger, usage);
     logger.info("step_complete", {
       capability: "pipeline",
       step: "audit",
+      duration_ms: Date.now() - auditStartMs,
       model_id: auditModel.modelID,
       pass: state.auditArtifact.approved_for_delivery,
+      status: state.auditArtifact.degraded ? "degraded" : "ok",
+      degraded: state.auditArtifact.degraded ? true : undefined,
     });
 
     const auditValidation = validate("AuditArtifact", state.auditArtifact);
@@ -373,6 +426,16 @@ export async function runPipelineWithArtifact(
       outcome: state.auditArtifact.approved_for_delivery ? "success" : "degraded",
     });
 
+    writeCapabilityAudit({
+      capability: "pipeline",
+      input_summary: buildCapabilityInputSummary(inputWordCount),
+      outcome: state.auditArtifact.approved_for_delivery ? "success" : "degraded",
+      duration_ms: durationMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: state.warnings.length,
+    });
+
     return createCapabilityOutput({
       capability: "pipeline",
       inputSummary: buildInputSummary(brief, state),
@@ -385,6 +448,15 @@ export async function runPipelineWithArtifact(
       metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
     });
   } catch (error) {
+    writeCapabilityAudit({
+      capability: "pipeline",
+      input_summary: buildCapabilityInputSummary(inputWordCount),
+      outcome: "failed",
+      duration_ms: Date.now() - startMs,
+      total_tokens: usage.total_tokens,
+      total_cost: usage.total_cost,
+      assumptions_count: state.warnings.length,
+    });
     logger.error("capability_error", {
       capability: "pipeline",
       degraded: false,
