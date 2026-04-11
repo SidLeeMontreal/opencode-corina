@@ -1,3 +1,9 @@
+/**
+ * Append-only JSONL audit sink for plugin events (`AuditLogEntry`).
+ * File: `$XDG_DATA_HOME/opencode/corina-audit.jsonl`, or `~/.local/share/...` when unset.
+ * Appends are serialized (one queue) so lines stay ordered under concurrent hooks; I/O errors
+ * are logged and never thrown — audit failures must not break the plugin.
+ */
 import { mkdirSync } from "node:fs";
 import { appendFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";

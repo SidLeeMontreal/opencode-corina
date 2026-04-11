@@ -59,6 +59,10 @@ Responsibilities:
 - `session.idle` → write `session_idle` audit entry
 - Future: `tool.execute.before` for guardrails and quota enforcement
 
+## Local dev setup
+
+`npm install` runs `preinstall` (`scripts/ensure-opencode-deps.mjs`), which clones `opencode-model-resolver`, `opencode-text-tools`, and `opencode-eval-harness` into `deps/` and builds them so `file:deps/…` resolves. **Git** must be available. To skip cloning (you already maintain `deps/`): `SKIP_OPENCODE_DEPS=1`. For OpenCode’s `.opencode/` tooling, run `npm install` from the repo root first so those paths exist. Details: `README.md` (local plugin section).
+
 ## Prompt Governance
 
 All prompts live in `prompts/` (versioned in repo):
