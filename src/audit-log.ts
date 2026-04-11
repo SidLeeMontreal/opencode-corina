@@ -1,4 +1,5 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { appendFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 
@@ -23,14 +24,20 @@ function ensureAuditDirOnce(): void {
   auditDirEnsured = true;
 }
 
+/** Serializes appends so JSONL line order matches invocation order under concurrent hooks. */
+let appendQueue: Promise<void> = Promise.resolve();
+
 export function writeAuditLog(entry: AuditLogEntry): void {
-  try {
-    ensureAuditDirOnce();
-    appendFileSync(auditLogPath, `${JSON.stringify(entry)}\n`, "utf8");
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`[opencode-corina] audit log write failed: ${message}`);
-  }
+  const line = `${JSON.stringify(entry)}\n`;
+  appendQueue = appendQueue.then(async () => {
+    try {
+      ensureAuditDirOnce();
+      await appendFile(auditLogPath, line, "utf8");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[opencode-corina] audit log write failed: ${message}`);
+    }
+  });
 }
 
 export { auditLogPath };

@@ -46,7 +46,7 @@ npm install -g opencode-corina
 
 Clone this repo and run OpenCode from the repo root. OpenCode will automatically load `.opencode/plugins/corina.ts`.
 
-Dependencies for local use are declared in `.opencode/package.json` and installed by OpenCode via Bun at startup. If sibling packages (`opencode-model-resolver`, `opencode-text-tools`) are not at `../`, update the `file:` paths accordingly.
+Dependencies for local use are declared in `.opencode/package.json` and installed by OpenCode via Bun at startup. Run `npm install` in this repo first: the `preinstall` script clones `opencode-model-resolver`, `opencode-text-tools`, and `opencode-eval-harness` into `deps/`, builds them, and wires them via `file:deps/…`. Git is required. Set `SKIP_OPENCODE_DEPS=1` to skip that step if you manage `deps/` yourself.
 
 ### Tool usage
 
@@ -121,7 +121,7 @@ Suggested workflow:
 
 ## Evaluation workflow
 
-Corina now uses the sibling `opencode-eval-harness` package for structured eval runs.
+Corina uses the `opencode-eval-harness` package (cloned into `deps/` by `npm install`) for structured eval runs.
 
 ### Corpus and suites
 

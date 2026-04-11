@@ -5,7 +5,7 @@
  * committed — full git clones are required.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,6 +44,9 @@ function main() {
   for (const { dir, url, distMarker } of REPOS) {
     const target = join(depsRoot, dir);
     if (!existsSync(join(target, ".git"))) {
+      if (existsSync(target)) {
+        rmSync(target, { recursive: true, force: true });
+      }
       console.log(`[opencode-corina] cloning ${dir}…`);
       execFileSync("git", ["clone", "--depth", "1", "--branch", "main", url, target], {
         stdio: "inherit",
