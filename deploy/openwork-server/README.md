@@ -32,6 +32,7 @@ npm run deploy:dev
 
 ## Runtime notes
 
-- Startup runs `npm install`, `npm run build`, and `npm run install-corina` only when the mounted workspace needs it.
-- Session work directories mirror the repo root via symlinks so Corina resolves `.opencode/`, `src/`, `prompts/`, and `schemas/` from the canonical workspace.
+- Startup prepares a mutable runtime workspace at `/var/workspace/runtime`.
+- Most repo paths are linked into that runtime workspace, while `.opencode/` and `.corina-local/` are copied into it so generated/runtime files do not mutate a bind-mounted checkout.
+- Startup installs root dependencies only when `node_modules` or `deps/` are missing, builds when `dist/` is missing, and always refreshes `install-corina` into the runtime workspace.
 - The deployment-specific OpenCode config is generated at runtime from `opencode.jsonc`; the repo root does not need a second hosted-only config file.
