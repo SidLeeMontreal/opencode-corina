@@ -1,6 +1,23 @@
 # opencode-corina
 
-Corina is a writing plugin for OpenCode that wraps a gated five-step editorial workflow around a strategic writing agent. The package in this repository is the orchestrator: it validates structured artifacts, coordinates each stage of the pipeline, and records audit events.
+Corina is a writing plugin for OpenCode that wraps a gated five-step editorial workflow around a strategic writing agent. The repo root is canonical: it owns Corina capability logic, prompts, schemas, tools, tests, and evals. This repo also includes a hosted deployment wrapper under `deploy/openwork-server/` so the same root runtime can be served through OpenWork.
+
+## Repo modes
+
+This repo operates in two modes:
+
+1. **plugin/package mode** at repo root
+2. **hosted deployment mode** under `deploy/openwork-server/`
+
+Separation of concerns:
+
+- **Repo root**: Corina behavior, editorial pipeline, prompts, schemas, evals, tests, and local `.opencode/` assets
+- **`deploy/openwork-server/`**: container, proxy, OpenWork wiring, and deployment configuration for hosting the root repo
+
+Architecture references:
+
+- `docs/architecture-plugin.md`
+- `docs/architecture-deployment.md`
 
 ## What Corina is
 
@@ -14,19 +31,30 @@ Corina is designed for higher-signal writing work where a single draft is not en
 
 That structure makes it easier to add guardrails, catch weak output earlier, and maintain a clear audit trail.
 
-## Install
+## Plugin/package mode
+
+This remains the canonical development workflow.
+
+### Install and build
 
 ```bash
 cd ~/dev/personal/opencode-corina
 npm install
 npm run build
+npm run install-corina
+```
+
+Useful follow-up checks:
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run eval:tier1
 ```
 
 To use the built package in OpenCode, point your local OpenCode plugin configuration at this repository after compilation.
 
-## Usage
-
-### As an npm package (recommended for teams)
+### As an npm package
 
 Add to your `opencode.json`:
 
@@ -42,11 +70,47 @@ Then install:
 npm install -g opencode-corina
 ```
 
-### As a local project plugin (for development)
+### As a local project plugin
 
 Clone this repo and run OpenCode from the repo root. OpenCode will automatically load `.opencode/plugins/corina.ts`.
 
 Dependencies for local use are declared in `.opencode/package.json` and installed by OpenCode via Bun at startup. Run `npm install` in this repo first: the `preinstall` script clones `opencode-model-resolver`, `opencode-text-tools`, and `opencode-eval-harness` into `deps/`, builds them, and wires them via `file:deps/…`. Git is required. Set `SKIP_OPENCODE_DEPS=1` to skip that step if you manage `deps/` yourself.
+
+## Hosted deployment mode
+
+The hosted wrapper lives entirely under `deploy/openwork-server/`.
+
+Root scripts for hosted operations:
+
+```bash
+npm run deploy:build
+npm run deploy:run
+npm run deploy:dev
+npm run deploy:compose
+```
+
+Typical setup:
+
+```bash
+cp deploy/openwork-server/.env.example deploy/openwork-server/.env
+npm run deploy:build
+npm run deploy:compose
+```
+
+For a local hosted dev loop against a bind-mounted checkout:
+
+```bash
+npm run deploy:dev
+```
+
+Use these files as the hosted source of truth:
+
+- `deploy/openwork-server/README.md`
+- `deploy/openwork-server/Dockerfile`
+- `deploy/openwork-server/entrypoint.sh`
+- `deploy/openwork-server/docker-compose.yml`
+- `deploy/openwork-server/opencode.jsonc`
+- `.github/workflows/build-and-deploy.yml`
 
 ### Tool usage
 
