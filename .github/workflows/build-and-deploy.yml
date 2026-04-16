@@ -44,7 +44,33 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 
 jobs:
+  pr-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract build args
+        id: vars
+        run: |
+          echo "opencode_version=${{ inputs.opencode_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+          echo "openwork_server_version=${{ inputs.openwork_server_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build hosted image only
+        run: |
+          docker build \
+            -f deploy/openwork-server/Dockerfile \
+            --build-arg OPENCODE_VERSION="${{ steps.vars.outputs.opencode_version }}" \
+            --build-arg OPENWORK_SERVER_VERSION="${{ steps.vars.outputs.openwork_server_version }}" \
+            -t opencode-corina-openwork:pr-${{ github.event.pull_request.number }} \
+            .
+
   build-and-deploy:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
