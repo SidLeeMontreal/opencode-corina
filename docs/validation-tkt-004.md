@@ -113,9 +113,11 @@ docker exec tkt004-runtime-shape sh -lc 'for p in /var/workspace/runtime/.openco
   - Tier 1 offline eval passes
   - install flow works at repo root and alternate install root
   - plugin entrypoint/path assumptions are internally consistent
-- Not fully validated live end-to-end in this environment:
-  - `npm run test:all` failed in integration tests because no OpenCode server was running at `127.0.0.1:4098`
+- Important caveat, directly evidenced:
+  - `npm run test:all` is not self-contained in this repo as exercised here
+  - it failed in integration tests because no OpenCode server was running at `127.0.0.1:4098`
   - failure mode was explicit and consistent: `TypeError: fetch failed` caused by `ECONNREFUSED 127.0.0.1:4098`
+  - that means full integration coverage was not proven by this run
 
 ### Deployment mode results
 - Operationally credible locally:
