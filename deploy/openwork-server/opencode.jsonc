@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "corina",
+  "model": "azure-anthropic/claude-opus-4-6",
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "control-chrome": {
+      "type": "local",
+      "command": [
+        "chrome-devtools-mcp"
+      ]
+    }
+  }
+}

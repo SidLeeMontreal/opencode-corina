@@ -1,0 +1,14 @@
+services:
+  corina-openwork:
+    build:
+      context: ../..
+      dockerfile: deploy/openwork-server/Dockerfile
+    platform: linux/amd64
+    ports:
+      - "8443:8443"
+      - "3001:3001"
+    volumes:
+      - ../..:/workspace:ro
+    env_file:
+      - .env
+    restart: unless-stopped

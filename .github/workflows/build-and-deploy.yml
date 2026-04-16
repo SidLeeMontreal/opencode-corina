@@ -1,0 +1,254 @@
+name: Build and Deploy Corina OpenWork
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+    inputs:
+      opencode_version:
+        description: OpenCode version
+        required: false
+        default: latest
+      openwork_server_version:
+        description: OpenWork Server version
+        required: false
+        default: latest
+
+env:
+  AZURE_AGENT_CLIENT_ID: ${{ secrets.AZURE_AGENT_CLIENT_ID }}
+  CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
+  CONTAINER_APP_ENV_NAME: ${{ vars.CONTAINER_APP_ENV_NAME }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+  OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+  AZURE_RESOURCE_NAME: ${{ vars.AZURE_RESOURCE_NAME }}
+  AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+  MICROSOFT_FOUNDRY_API_KEY: ${{ secrets.MICROSOFT_FOUNDRY_API_KEY }}
+  MICROSOFT_FOUNDRY_BASE_URL: ${{ secrets.MICROSOFT_FOUNDRY_BASE_URL }}
+  MICROSOFT_FOUNDRY_API_TYPE: ${{ vars.MICROSOFT_FOUNDRY_API_TYPE }}
+  MICROSOFT_FOUNDRY_API_VERSION: ${{ vars.MICROSOFT_FOUNDRY_API_VERSION }}
+  PROXY_API_KEY: ${{ secrets.PROXY_API_KEY }}
+  AZURE_STORAGE_ACCOUNT_NAME: ${{ vars.AZURE_STORAGE_ACCOUNT_NAME }}
+  AZURE_STORAGE_SHARE_NAME: ${{ vars.AZURE_STORAGE_SHARE_NAME }}
+  AZURE_STORAGE_ACCESS_KEY: ${{ secrets.AZURE_STORAGE_ACCESS_KEY }}
+  WORKSPACE_SHARE_NAME: ${{ vars.AZURE_STORAGE_SHARE_NAME }}
+  AZURE_AGENT_TENANT_ID: ${{ secrets.AZURE_AGENT_TENANT_ID }}
+  AZURE_AGENT_SUBSCRIPTION_ID: ${{ secrets.AZURE_AGENT_SUBSCRIPTION_ID }}
+  REGISTRY_NAME: ${{ secrets.REGISTRY_NAME }}
+  REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+  REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+jobs:
+  pr-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CI_REPO_READ_TOKEN: ${{ secrets.CI_REPO_READ_TOKEN }}
+      GITHUB_TOKEN_FALLBACK: ${{ github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Probe private eval harness access
+        id: probe
+        continue-on-error: true
+        run: |
+          TOKEN="${CI_REPO_READ_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+          git -c http.extraheader="AUTHORIZATION: bearer ${TOKEN}" ls-remote https://github.com/SidLeeMontreal/opencode-eval-harness.git HEAD
+
+      - name: Prepare private eval harness for Docker build context
+        if: steps.probe.outcome == 'success'
+        run: |
+          TOKEN="${CI_REPO_READ_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+          rm -rf deps/opencode-eval-harness
+          git -c http.extraheader="AUTHORIZATION: bearer ${TOKEN}" clone --depth 1 --branch main https://github.com/SidLeeMontreal/opencode-eval-harness.git deps/opencode-eval-harness
+          npm install --prefix deps/opencode-eval-harness
+          npm run build --prefix deps/opencode-eval-harness
+
+      - name: Extract build args
+        if: steps.probe.outcome == 'success'
+        id: vars
+        run: |
+          echo "opencode_version=${{ inputs.opencode_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+          echo "openwork_server_version=${{ inputs.openwork_server_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build hosted image only
+        if: steps.probe.outcome == 'success'
+        run: |
+          docker build \
+            -f deploy/openwork-server/Dockerfile \
+            --build-arg OPENCODE_VERSION="${{ steps.vars.outputs.opencode_version }}" \
+            --build-arg OPENWORK_SERVER_VERSION="${{ steps.vars.outputs.openwork_server_version }}" \
+            -t opencode-corina-openwork:pr-${{ github.event.pull_request.number }} \
+            .
+
+      - name: Skip notice when private dependency access is unavailable
+        if: steps.probe.outcome != 'success'
+        run: echo "::notice::Skipping hosted image PR build because private dependency access is unavailable in this CI context."
+
+  build-and-deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_AGENT_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_AGENT_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_AGENT_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: docker login ${{ env.REGISTRY_NAME }} -u ${{ env.REGISTRY_USERNAME }} -p ${{ env.REGISTRY_PASSWORD }}
+
+      - name: Extract short SHA
+        id: vars
+        run: |
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "opencode_version=${{ inputs.opencode_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+          echo "openwork_server_version=${{ inputs.openwork_server_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}"
+          TAG="${{ steps.vars.outputs.short_sha }}"
+          docker build \
+            -f deploy/openwork-server/Dockerfile \
+            --build-arg OPENCODE_VERSION="${{ steps.vars.outputs.opencode_version }}" \
+            --build-arg OPENWORK_SERVER_VERSION="${{ steps.vars.outputs.openwork_server_version }}" \
+            -t "$IMAGE:$TAG" \
+            -t "$IMAGE:latest" \
+            .
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
+
+      - name: Configure Azure Files storage
+        run: |
+          az containerapp env storage set \
+            --name ${{ env.CONTAINER_APP_ENV_NAME }} \
+            --resource-group sidlee-ai-agents-prod \
+            --storage-name ${{ env.WORKSPACE_SHARE_NAME }} \
+            --azure-file-account-name ${{ env.AZURE_STORAGE_ACCOUNT_NAME }} \
+            --azure-file-account-key ${{ env.AZURE_STORAGE_ACCESS_KEY }} \
+            --azure-file-share-name ${{ env.AZURE_STORAGE_SHARE_NAME }} \
+            --access-mode ReadWrite
+
+      - name: Deploy to Container App
+        run: |
+          IMAGE="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.short_sha }}"
+
+          if az containerapp show --name ${{ env.CONTAINER_APP_NAME }} --resource-group sidlee-ai-agents-prod > /dev/null 2>&1; then
+            az containerapp registry set \
+              --name ${{ env.CONTAINER_APP_NAME }} \
+              --resource-group sidlee-ai-agents-prod \
+              --server ${{ env.REGISTRY_NAME }} \
+              --username ${{ env.REGISTRY_USERNAME }} \
+              --password ${{ env.REGISTRY_PASSWORD }}
+
+            az containerapp update \
+              --name ${{ env.CONTAINER_APP_NAME }} \
+              --resource-group sidlee-ai-agents-prod \
+              --image "$IMAGE" \
+              --min-replicas 1 \
+              --max-replicas 1
+          else
+            az containerapp create \
+              --name ${{ env.CONTAINER_APP_NAME }} \
+              --resource-group sidlee-ai-agents-prod \
+              --environment ${{ env.CONTAINER_APP_ENV_NAME }} \
+              --image "$IMAGE" \
+              --registry-server ${{ env.REGISTRY_NAME }} \
+              --registry-username ${{ env.REGISTRY_USERNAME }} \
+              --registry-password ${{ env.REGISTRY_PASSWORD }} \
+              --ingress external \
+              --target-port 8443 \
+              --transport http \
+              --min-replicas 1 \
+              --max-replicas 1 \
+              --env-vars \
+                OPENCODE_MODEL="${{ env.OPENCODE_MODEL }}" \
+                ANTHROPIC_API_KEY="${{ env.ANTHROPIC_API_KEY }}" \
+                ANTHROPIC_BASE_URL="${{ env.ANTHROPIC_BASE_URL }}" \
+                AZURE_RESOURCE_NAME="${{ env.AZURE_RESOURCE_NAME }}" \
+                AZURE_API_KEY="${{ env.AZURE_API_KEY }}" \
+                MICROSOFT_FOUNDRY_API_KEY="${{ env.MICROSOFT_FOUNDRY_API_KEY }}" \
+                MICROSOFT_FOUNDRY_BASE_URL="${{ env.MICROSOFT_FOUNDRY_BASE_URL }}" \
+                MICROSOFT_FOUNDRY_API_TYPE="${{ env.MICROSOFT_FOUNDRY_API_TYPE }}" \
+                MICROSOFT_FOUNDRY_API_VERSION="${{ env.MICROSOFT_FOUNDRY_API_VERSION }}" \
+                PROXY_API_KEY="${{ env.PROXY_API_KEY }}"
+          fi
+
+      - name: Enable ingress
+        run: |
+          az containerapp ingress enable \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group sidlee-ai-agents-prod \
+            --type external \
+            --target-port 8443 \
+            --transport http
+
+      - name: Configure volume mount
+        run: |
+          IMAGE="${{ env.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.short_sha }}"
+
+          python3 -c "
+          import yaml
+          env_vars = [
+            {'name': 'OPENCODE_MODEL', 'value': '${{ env.OPENCODE_MODEL }}'},
+            {'name': 'ANTHROPIC_API_KEY', 'value': '${{ env.ANTHROPIC_API_KEY }}'},
+            {'name': 'ANTHROPIC_BASE_URL', 'value': '${{ env.ANTHROPIC_BASE_URL }}'},
+            {'name': 'AZURE_RESOURCE_NAME', 'value': '${{ env.AZURE_RESOURCE_NAME }}'},
+            {'name': 'AZURE_API_KEY', 'value': '${{ env.AZURE_API_KEY }}'},
+            {'name': 'MICROSOFT_FOUNDRY_API_KEY', 'value': '${{ env.MICROSOFT_FOUNDRY_API_KEY }}'},
+            {'name': 'MICROSOFT_FOUNDRY_BASE_URL', 'value': '${{ env.MICROSOFT_FOUNDRY_BASE_URL }}'},
+            {'name': 'MICROSOFT_FOUNDRY_API_TYPE', 'value': '${{ env.MICROSOFT_FOUNDRY_API_TYPE }}'},
+            {'name': 'MICROSOFT_FOUNDRY_API_VERSION', 'value': '${{ env.MICROSOFT_FOUNDRY_API_VERSION }}'},
+            {'name': 'PROXY_API_KEY', 'value': '${{ env.PROXY_API_KEY }}'},
+          ]
+          doc = {
+            'properties': {
+              'template': {
+                'volumes': [{
+                  'name': 'workspace-volume',
+                  'storageName': '${{ env.WORKSPACE_SHARE_NAME }}',
+                  'storageType': 'AzureFile'
+                }],
+                'containers': [{
+                  'name': '${{ env.CONTAINER_APP_NAME }}',
+                  'image': '${IMAGE}',
+                  'env': env_vars,
+                  'volumeMounts': [{
+                    'volumeName': 'workspace-volume',
+                    'mountPath': '/workspace'
+                  }]
+                }]
+              }
+            }
+          }
+          yaml.dump(doc, open('/tmp/containerapp-patch.yaml', 'w'), default_flow_style=False)
+          "
+
+          az containerapp update \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group sidlee-ai-agents-prod \
+            --yaml /tmp/containerapp-patch.yaml

@@ -7,20 +7,46 @@ on:
 jobs:
   eval-tier1:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CI_REPO_READ_TOKEN: ${{ secrets.CI_REPO_READ_TOKEN }}
+      GITHUB_TOKEN_FALLBACK: ${{ github.token }}
     steps:
       - name: Checkout Corina
         uses: actions/checkout@v4
 
+      - name: Probe private eval harness access
+        id: probe
+        continue-on-error: true
+        run: |
+          TOKEN="${CI_REPO_READ_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+          git -c http.extraheader="AUTHORIZATION: bearer ${TOKEN}" ls-remote https://github.com/SidLeeMontreal/opencode-eval-harness.git HEAD
+
+      - name: Configure git for private deps
+        if: steps.probe.outcome == 'success'
+        run: |
+          TOKEN="${CI_REPO_READ_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+
       - name: Setup Node
+        if: steps.probe.outcome == 'success'
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Install Corina deps
+        if: steps.probe.outcome == 'success'
         run: npm ci
 
       - name: Build Corina
+        if: steps.probe.outcome == 'success'
         run: npm run build
 
       - name: Run Tier 1 eval
+        if: steps.probe.outcome == 'success'
         run: npm run eval:tier1
+
+      - name: Skip notice when private dependency access is unavailable
+        if: steps.probe.outcome != 'success'
+        run: echo "::notice::Skipping tier-1 eval because private dependency access is unavailable in this CI context."

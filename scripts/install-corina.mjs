@@ -1,15 +1,16 @@
 #!/usr/bin/env node
-import { mkdirSync, cpSync, readFileSync, writeFileSync, readdirSync } from "fs"
-import { join, dirname } from "path"
+import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs"
+import { dirname, join, resolve } from "path"
 import { fileURLToPath } from "url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const repoRoot = join(__dirname, "..")
+const repoRoot = resolve(join(__dirname, ".."))
+const installRoot = resolve(process.env.CORINA_INSTALL_ROOT || repoRoot)
 const sourceDir = join(repoRoot, "agents")
-const targetDir = join(repoRoot, ".opencode", "agents")
+const targetDir = join(installRoot, ".opencode", "agents")
 
 mkdirSync(targetDir, { recursive: true })
-mkdirSync(join(repoRoot, ".corina-local", "prompts"), { recursive: true })
+mkdirSync(join(installRoot, ".corina-local", "prompts"), { recursive: true })
 cpSync(sourceDir, targetDir, { recursive: true, force: true })
 
 for (const entry of readdirSync(targetDir)) {
@@ -19,6 +20,8 @@ for (const entry of readdirSync(targetDir)) {
   writeFileSync(filePath, content)
 }
 
-console.log("✅ Corina agents installed in .opencode/agents/")
+const relativeTarget = installRoot === repoRoot ? ".opencode/agents" : `${installRoot}/.opencode/agents`
+
+console.log(`✅ Corina agents installed in ${relativeTarget}`)
 console.log("   Restart your OpenCode server from the repo root.")
 console.log("   Local prompt overrides: .corina-local/prompts/")
