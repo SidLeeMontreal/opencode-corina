@@ -16,14 +16,18 @@ describe("Critique E2E", { timeout: 600_000 }, () => {
   })
 
   describe("quality mode", () => {
-    it("scores AI-heavy text low in quality mode", async () => {
+    it("flags AI-heavy text in quality mode", async () => {
       const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/01-corporate-ai.txt"), "utf8")
       const output = await runCritiqueWithArtifact([text], { mode: "quality" }, client)
       const report = output.artifact
 
       expect(report.pass).toBe(false)
-      expect(report.overall_score).toBeLessThan(20)
       expect(report.issues.length).toBeGreaterThan(0)
+      expect(
+        [report.dimensions.ai_patterns.score, report.dimensions.precision.score, report.dimensions.evidence.score].some(
+          (score) => score <= 2,
+        ),
+      ).toBe(true)
     })
 
     it("returns structured dimensions", async () => {

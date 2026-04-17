@@ -160,6 +160,79 @@ Supporting assets:
 - `schemas/` contains the JSON schemas used for validation.
 - `agents/` contains the installed OpenCode agent markdown definitions copied into the package.
 
+## Testing
+
+### Offline-only test commands
+
+These commands do not require a running OpenCode server:
+
+```bash
+npm run test
+npm run test:unit
+npm run test:regression
+npm run eval:tier1
+```
+
+### Live OpenCode-dependent commands
+
+These commands are **not** self-contained from this repo alone. They require a running local OpenCode server plus whatever non-repo OpenCode/provider configuration that server needs on your machine.
+
+```bash
+npm run test:integration
+npm run test:all
+npm run eval:tier2
+npm run eval:baseline
+```
+
+Why:
+- every file under `tests/integration/` creates an SDK client with `process.env.OPENCODE_URL ?? "http://127.0.0.1:4098"`
+- `src/tool-runtime.ts` uses the same default, with `OPENCODE_BASE_URL` accepted as an alias
+- `scripts/run-eval.mjs` uses the same live endpoint for Tier 2 (`--mode judge`) and compare/baseline runs
+
+### Local live integration-test flow
+
+Minimum prerequisites:
+- `npm install`
+- local OpenCode CLI/runtime installed and available as `opencode`
+- usable OpenCode/provider configuration outside this repo if your local OpenCode setup requires it
+
+Install Corina's local agents from the repo root:
+
+```bash
+npm run install-corina
+```
+
+Start the local OpenCode server from the repo root:
+
+```bash
+opencode serve --hostname 127.0.0.1 --port 4098 --print-logs
+```
+
+In another shell, verify the server:
+
+```bash
+curl -fsS http://127.0.0.1:4098/global/health
+```
+
+Then run the live integration suite, the full suite, or a specific live test file:
+
+```bash
+OPENCODE_URL=http://127.0.0.1:4098 npm run test:integration
+OPENCODE_URL=http://127.0.0.1:4098 npm run test:all
+OPENCODE_URL=http://127.0.0.1:4098 npx vitest run tests/integration/pipeline.e2e.test.ts
+```
+
+Environment and defaults:
+- default live endpoint: `http://127.0.0.1:4098`
+- primary env var: `OPENCODE_URL`
+- runtime alias used by `src/tool-runtime.ts`: `OPENCODE_BASE_URL`
+- expected local port in repo docs/tests: `4098`
+
+Important caveat:
+- `npm run test:all` includes the live integration tests, so it will fail if no OpenCode server is running at the configured URL
+- under the validated local setup (`OPENCODE_URL=http://127.0.0.1:4098` with a healthy local OpenCode server), `test:unit`, `test:regression`, `test:integration`, and `test:all` all pass
+- live-path results still depend on the external OpenCode/provider behavior behind that server
+
 ## Contributing
 
 Contributions are welcome, especially in these areas:
