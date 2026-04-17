@@ -228,10 +228,12 @@ Environment and defaults:
 - runtime alias used by `src/tool-runtime.ts`: `OPENCODE_BASE_URL`
 - expected local port in repo docs/tests: `4098`
 
-Important caveat:
-- `npm run test:all` includes the live integration tests, so it will fail if no OpenCode server is running at the configured URL
-- under the validated local setup (`OPENCODE_URL=http://127.0.0.1:4098` with a healthy local OpenCode server), `test:unit`, `test:regression`, `test:integration`, and `test:all` all pass
-- live-path results still depend on the external OpenCode/provider behavior behind that server
+Current truth:
+- the local OpenCode live path is documented and validated at `http://127.0.0.1:4098`
+- `test:integration` is green under that validated setup
+- `test:all` is green under that validated setup
+- `npm run test:all` still includes the live integration tests, so it will fail if no OpenCode server is running at the configured URL
+- live-path results are still not fully self-contained from this repo alone because they depend on OpenCode/runtime/provider setup behind that server
 
 ## Contributing
 

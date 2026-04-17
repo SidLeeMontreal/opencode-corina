@@ -30,9 +30,15 @@ Useful follow-up commands:
 
 ```bash
 npm run test:unit
-npm run test:integration
+OPENCODE_URL=http://127.0.0.1:4098 npm run test:integration
+OPENCODE_URL=http://127.0.0.1:4098 npm run test:all
 npm run eval:tier1
 ```
+
+Notes:
+- the local live-test path is validated against a healthy OpenCode server at `127.0.0.1:4098`
+- under that setup, `test:integration` and `test:all` are green
+- those live tests are still not repo-only or fully self-contained, because they depend on external OpenCode/runtime/provider configuration
 
 ## Execution shape
 
