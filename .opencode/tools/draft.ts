@@ -1,17 +1,16 @@
 /**
- * write — Corina's gated editorial pipeline tool.
+ * draft — Corina's gated editorial drafting tool.
  * Standalone tool file. Loaded by OpenCode from .opencode/tools/ automatically.
- * Logging is handled by the plugin's tool.execute.after hook.
  */
 import { tool } from "@opencode-ai/plugin"
 import type { StepModelConfig } from "opencode-model-resolver"
 
-import { runPipelineWithArtifact } from "../../src/pipeline.js"
+import { runDraftWithArtifact } from "../../src/pipeline.js"
 import { makeConsoleLogger } from "../../src/logger.js"
 import { createToolRuntimeClient } from "../../src/tool-runtime.js"
 import type { PipelineModelConfig } from "../../src/types.js"
 
-const logger = makeConsoleLogger("write-tool")
+const logger = makeConsoleLogger("draft-tool")
 
 function buildUniformModelConfig(modelPreset?: "fast" | "balanced" | "quality"): Partial<PipelineModelConfig> | undefined {
   if (!modelPreset) return undefined
@@ -28,18 +27,16 @@ function buildUniformModelConfig(modelPreset?: "fast" | "balanced" | "quality"):
 
 export default tool({
   description:
-    "Run Corina's gated editorial pipeline and return the final draft. Optionally override every pipeline step with a uniform modelPreset: fast, balanced, or quality.",
+    "Draft human-readable content through Corina's editorial pipeline. Returns a structured envelope by default where artifact is canonical output, rendered is presentation output, and should_persist indicates whether callers should persist artifact.final_content. This tool drafts content and does not write files.",
   args: {
-    brief: tool.schema.string().min(1).describe("Writing brief or request for Corina's editorial pipeline."),
+    brief: tool.schema.string().min(1).describe("Writing brief or request for Corina's editorial drafting pipeline."),
     modelPreset: tool.schema
       .enum(["fast", "balanced", "quality"])
       .optional()
       .describe("Optional uniform model preset override for all pipeline steps."),
-    format: tool.schema.string().optional().describe("Optional output format. Use json for the universal envelope."),
   },
-  async execute({ brief, modelPreset, format }, context) {
+  async execute({ brief, modelPreset }, context) {
     const client = createToolRuntimeClient(context)
-    const output = await runPipelineWithArtifact(brief, client, buildUniformModelConfig(modelPreset), logger)
-    return format === "json" ? JSON.stringify(output, null, 2) : output.rendered
+    return runDraftWithArtifact(brief, client, buildUniformModelConfig(modelPreset), logger)
   },
 })

@@ -5,6 +5,27 @@ export type OpenCodeClient = PluginInput["client"];
 export type { AgentCapabilityOutput } from "opencode-text-tools";
 export type { ModelInfo, Preset, ResolvedModel, StepModelConfig } from "opencode-model-resolver";
 
+export type ToolOutcome = "success" | "degraded" | "failed";
+
+export interface CorinaToolEnvelope<TArtifact> {
+  agent: "corina";
+  capability: string;
+  outcome: ToolOutcome;
+  should_persist: boolean;
+  artifact: TArtifact | null;
+  rendered: string;
+  warnings: string[];
+  metrics: {
+    total_tokens?: number;
+    total_cost?: number;
+  };
+  version: string;
+  timestamp: string;
+  input_summary: string;
+  chained_to?: string;
+  chain_result?: unknown;
+}
+
 export type ToneVoice =
   | "journalist"
   | "technical"
@@ -163,6 +184,11 @@ export interface AuditArtifact {
   findings?: EvaluationFinding[];
   module_status?: Partial<Record<EvaluationModuleId, ModuleRunStatus>>;
   degraded?: boolean;
+}
+
+export interface DraftToolArtifact {
+  final_content: string;
+  audit: AuditArtifact;
 }
 
 export interface PersonalVoiceProfile {

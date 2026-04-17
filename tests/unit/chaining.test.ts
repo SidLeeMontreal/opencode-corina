@@ -14,7 +14,9 @@ vi.mock("../../src/detect-layer2.js", () => ({
 vi.mock("../../src/pipeline.js", () => ({
   runPipelineWithArtifact: vi.fn(async () => ({
     agent: "corina",
-    capability: "pipeline",
+    capability: "draft",
+    outcome: "success",
+    should_persist: true,
     version: "test",
     timestamp: new Date().toISOString(),
     input_summary: "mock pipeline",
@@ -30,6 +32,8 @@ vi.mock("../../src/pipeline.js", () => ({
       },
     },
     rendered: "Rewritten to remove AI patterns.",
+    warnings: [],
+    metrics: {},
   })),
 }));
 
