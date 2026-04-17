@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+  pull_request:
+    branches: [main]
+
   workflow_dispatch:
     inputs:
       opencode_version:
@@ -41,7 +44,64 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 
 jobs:
+  pr-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CI_REPO_READ_TOKEN: ${{ secrets.CI_REPO_READ_TOKEN }}
+      GITHUB_TOKEN_FALLBACK: ${{ github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Probe private eval harness access
+        id: probe
+        continue-on-error: true
+        run: |
+          TOKEN="${CI_REPO_READ_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+          git -c http.extraheader="AUTHORIZATION: bearer ${TOKEN}" ls-remote https://github.com/SidLeeMontreal/opencode-eval-harness.git HEAD
+
+      - name: Prepare private eval harness for Docker build context
+        if: steps.probe.outcome == 'success'
+        run: |
+          TOKEN="${CI_REPO_READ_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+          rm -rf deps/opencode-eval-harness
+          git -c http.extraheader="AUTHORIZATION: bearer ${TOKEN}" clone --depth 1 --branch main https://github.com/SidLeeMontreal/opencode-eval-harness.git deps/opencode-eval-harness
+          npm install --prefix deps/opencode-eval-harness
+          npm run build --prefix deps/opencode-eval-harness
+
+      - name: Extract build args
+        if: steps.probe.outcome == 'success'
+        id: vars
+        run: |
+          echo "opencode_version=${{ inputs.opencode_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+          echo "openwork_server_version=${{ inputs.openwork_server_version || 'latest' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build hosted image only
+        if: steps.probe.outcome == 'success'
+        run: |
+          docker build \
+            -f deploy/openwork-server/Dockerfile \
+            --build-arg OPENCODE_VERSION="${{ steps.vars.outputs.opencode_version }}" \
+            --build-arg OPENWORK_SERVER_VERSION="${{ steps.vars.outputs.openwork_server_version }}" \
+            -t opencode-corina-openwork:pr-${{ github.event.pull_request.number }} \
+            .
+
+      - name: Skip notice when private dependency access is unavailable
+        if: steps.probe.outcome != 'success'
+        run: echo "::notice::Skipping hosted image PR build because private dependency access is unavailable in this CI context."
+
   build-and-deploy:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       id-token: write

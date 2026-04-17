@@ -406,6 +406,130 @@ function summarizeFinding(finding: EvaluationFinding): string {
   return `${finding.rule_id}${location}: ${finding.explanation}`;
 }
 
+function collectStrings(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  return [];
+}
+
+function mapQualityDimensionName(name: unknown): keyof CritiqueArtifact["dimensions"] | null {
+  if (typeof name !== "string") return null;
+  const normalized = name.trim().toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
+
+  if (["prose quality", "prose", "ai patterns", "ai pattern", "originality"].includes(normalized)) return "ai_patterns";
+  if (["voice tone", "voice and tone", "tone", "voice"].includes(normalized)) return "tone";
+  if (["evidence support", "evidence and support", "evidence"].includes(normalized)) return "evidence";
+  if (["structure argument", "structure and argument", "structure", "rhythm"].includes(normalized)) return "rhythm";
+  if (["clarity", "precision", "clarity precision"].includes(normalized)) return "precision";
+
+  return null;
+}
+
+function extractQualityDimensionIssues(value: unknown): string[] {
+  if (!value || typeof value !== "object") return [];
+  const dimension = value as { assessment?: unknown; findings?: unknown };
+  const issues = new Set<string>();
+
+  for (const finding of Array.isArray(dimension.findings) ? dimension.findings : []) {
+    if (!finding || typeof finding !== "object") continue;
+    const entry = finding as { pattern?: unknown; note?: unknown; excerpt?: unknown };
+    const pattern = typeof entry.pattern === "string" ? entry.pattern.trim() : "";
+    const note = typeof entry.note === "string" ? entry.note.trim() : "";
+    const excerpt = typeof entry.excerpt === "string" ? entry.excerpt.trim() : "";
+    const summary = [pattern, note].filter(Boolean).join(": ") || excerpt;
+    if (summary) issues.add(summary);
+  }
+
+  if (!issues.size && typeof dimension.assessment === "string" && dimension.assessment.trim()) {
+    issues.add(dimension.assessment.trim());
+  }
+
+  return [...issues];
+}
+
+function normalizeQualityDimensions(rawDimensions: unknown): CritiqueArtifact["dimensions"] | null {
+  if (rawDimensions && typeof rawDimensions === "object" && !Array.isArray(rawDimensions)) {
+    const candidate = rawDimensions as CritiqueArtifact["dimensions"];
+    if (candidate.ai_patterns && candidate.tone && candidate.precision && candidate.evidence && candidate.rhythm) {
+      return candidate;
+    }
+  }
+
+  if (!Array.isArray(rawDimensions)) return null;
+
+  const fallback: CritiqueArtifact["dimensions"] = {
+    ai_patterns: { score: 6, issues: [] },
+    tone: { score: 6, issues: [] },
+    precision: { score: 6, issues: [] },
+    evidence: { score: 6, issues: [] },
+    rhythm: { score: 6, issues: [] },
+  };
+
+  for (const entry of rawDimensions) {
+    if (!entry || typeof entry !== "object") continue;
+    const dimension = entry as { name?: unknown; id?: unknown; score?: unknown };
+    const key = mapQualityDimensionName(dimension.id ?? dimension.name);
+    if (!key) continue;
+    fallback[key] = {
+      score: typeof dimension.score === "number" ? Math.max(0, Math.min(6, dimension.score)) : fallback[key].score,
+      issues: extractQualityDimensionIssues(entry),
+    };
+  }
+
+  return fallback;
+}
+
+function collectQualityRevisionInstructions(rawArtifact: unknown): string[] {
+  const instructions = new Set<string>();
+  if (!rawArtifact || typeof rawArtifact !== "object") return [];
+
+  for (const value of collectStrings((rawArtifact as { revision_instructions?: unknown }).revision_instructions)) {
+    instructions.add(value);
+  }
+
+  for (const value of collectStrings((rawArtifact as { top_recommendations?: unknown }).top_recommendations)) {
+    instructions.add(value);
+  }
+
+  const dimensions = (rawArtifact as { dimensions?: unknown }).dimensions;
+  if (Array.isArray(dimensions)) {
+    for (const entry of dimensions) {
+      if (!entry || typeof entry !== "object") continue;
+      for (const value of collectStrings((entry as { revision_instructions?: unknown }).revision_instructions)) {
+        instructions.add(value);
+      }
+      for (const value of collectStrings((entry as { revision_instruction?: unknown }).revision_instruction)) {
+        instructions.add(value);
+      }
+    }
+  }
+
+  return [...instructions];
+}
+
+function buildFallbackQualityDimensions(findings: EvaluationFinding[]): CritiqueArtifact["dimensions"] {
+  const base = { ai_patterns: 6, tone: 6, precision: 6, evidence: 6, rhythm: 6 };
+  for (const finding of findings) {
+    const dimension = classifyDimension(finding);
+    if (!dimension) continue;
+    base[dimension] = Math.max(0, base[dimension] - severityPenalty(finding));
+  }
+  return {
+    ai_patterns: { score: base.ai_patterns, issues: findings.filter((finding) => classifyDimension(finding) === "ai_patterns").map(summarizeFinding) },
+    tone: { score: base.tone, issues: findings.filter((finding) => classifyDimension(finding) === "tone").map(summarizeFinding) },
+    precision: { score: base.precision, issues: findings.filter((finding) => classifyDimension(finding) === "precision").map(summarizeFinding) },
+    evidence: { score: base.evidence, issues: findings.filter((finding) => classifyDimension(finding) === "evidence").map(summarizeFinding) },
+    rhythm: { score: base.rhythm, issues: findings.filter((finding) => classifyDimension(finding) === "rhythm").map(summarizeFinding) },
+  };
+}
+
 function buildModuleTaskPrompt(input: {
   contextBlock: string;
   draft: string;
@@ -520,38 +644,20 @@ export async function runCritique(
     usage,
   });
 
-  const rawArtifact = adjudicator.raw as CritiqueArtifact;
+  const rawArtifact = (adjudicator.raw ?? {}) as Partial<CritiqueArtifact> & { dimensions?: unknown; fatal_issues?: unknown; overall_score?: unknown; pass?: unknown };
+  const normalizedDimensions = normalizeQualityDimensions(rawArtifact.dimensions);
   const artifact: CritiqueArtifact = {
     pass: Boolean(rawArtifact.pass),
     overall_score: typeof rawArtifact.overall_score === "number" ? rawArtifact.overall_score : 0,
-    dimensions: rawArtifact.dimensions ?? {
-      ai_patterns: { score: 6, issues: [] },
-      tone: { score: 6, issues: [] },
-      precision: { score: 6, issues: [] },
-      evidence: { score: 6, issues: [] },
-      rhythm: { score: 6, issues: [] },
-    },
-    revision_instructions: Array.isArray(rawArtifact.revision_instructions) ? rawArtifact.revision_instructions : [],
-    fatal_issues: Array.isArray(rawArtifact.fatal_issues) ? rawArtifact.fatal_issues : [],
+    dimensions: normalizedDimensions ?? buildFallbackQualityDimensions(findings),
+    revision_instructions: collectQualityRevisionInstructions(rawArtifact),
+    fatal_issues: collectStrings(rawArtifact.fatal_issues),
     findings,
     module_status,
     degraded: Object.values(module_status).includes("degraded"),
   };
 
-  if (!rawArtifact.dimensions) {
-    const base = { ai_patterns: 6, tone: 6, precision: 6, evidence: 6, rhythm: 6 };
-    for (const finding of findings) {
-      const dimension = classifyDimension(finding);
-      if (!dimension) continue;
-      base[dimension] = Math.max(0, base[dimension] - severityPenalty(finding));
-    }
-    artifact.dimensions = {
-      ai_patterns: { score: base.ai_patterns, issues: findings.filter((finding) => classifyDimension(finding) === "ai_patterns").map(summarizeFinding) },
-      tone: { score: base.tone, issues: findings.filter((finding) => classifyDimension(finding) === "tone").map(summarizeFinding) },
-      precision: { score: base.precision, issues: findings.filter((finding) => classifyDimension(finding) === "precision").map(summarizeFinding) },
-      evidence: { score: base.evidence, issues: findings.filter((finding) => classifyDimension(finding) === "evidence").map(summarizeFinding) },
-      rhythm: { score: base.rhythm, issues: findings.filter((finding) => classifyDimension(finding) === "rhythm").map(summarizeFinding) },
-    };
+  if (!normalizedDimensions) {
     artifact.overall_score = Object.values(artifact.dimensions).reduce((sum, dimension) => sum + dimension.score, 0);
     artifact.fatal_issues = findings.filter((finding) => finding.module === "evidence" && finding.severity === "blocking").map(summarizeFinding);
     artifact.revision_instructions = findings.filter((finding) => finding.severity !== "minor").map((finding) => finding.fix_hint);

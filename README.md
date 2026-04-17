@@ -1,6 +1,23 @@
 # opencode-corina
 
-Corina is a writing plugin for OpenCode that wraps a gated five-step editorial workflow around a strategic writing agent. The package in this repository is the orchestrator: it validates structured artifacts, coordinates each stage of the pipeline, and records audit events.
+Corina is a writing plugin for OpenCode that wraps a gated five-step editorial workflow around a strategic writing agent. The repo root is canonical: it owns Corina capability logic, prompts, schemas, tools, tests, and evals. This repo also includes a hosted deployment wrapper under `deploy/openwork-server/` so the same root runtime can be served through OpenWork.
+
+## Repo modes
+
+This repo operates in two modes:
+
+1. **plugin/package mode** at repo root
+2. **hosted deployment mode** under `deploy/openwork-server/`
+
+Separation of concerns:
+
+- **Repo root**: Corina behavior, editorial pipeline, prompts, schemas, evals, tests, and local `.opencode/` assets
+- **`deploy/openwork-server/`**: container, proxy, OpenWork wiring, and deployment configuration for hosting the root repo
+
+Architecture references:
+
+- `docs/architecture-plugin.md`
+- `docs/architecture-deployment.md`
 
 ## What Corina is
 
@@ -14,19 +31,30 @@ Corina is designed for higher-signal writing work where a single draft is not en
 
 That structure makes it easier to add guardrails, catch weak output earlier, and maintain a clear audit trail.
 
-## Install
+## Plugin/package mode
+
+This remains the canonical development workflow.
+
+### Install and build
 
 ```bash
 cd ~/dev/personal/opencode-corina
 npm install
 npm run build
+npm run install-corina
+```
+
+Useful follow-up checks:
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run eval:tier1
 ```
 
 To use the built package in OpenCode, point your local OpenCode plugin configuration at this repository after compilation.
 
-## Usage
-
-### As an npm package (recommended for teams)
+### As an npm package
 
 Add to your `opencode.json`:
 
@@ -42,11 +70,47 @@ Then install:
 npm install -g opencode-corina
 ```
 
-### As a local project plugin (for development)
+### As a local project plugin
 
 Clone this repo and run OpenCode from the repo root. OpenCode will automatically load `.opencode/plugins/corina.ts`.
 
 Dependencies for local use are declared in `.opencode/package.json` and installed by OpenCode via Bun at startup. Run `npm install` in this repo first: the `preinstall` script clones `opencode-model-resolver`, `opencode-text-tools`, and `opencode-eval-harness` into `deps/`, builds them, and wires them via `file:deps/…`. Git is required. Set `SKIP_OPENCODE_DEPS=1` to skip that step if you manage `deps/` yourself.
+
+## Hosted deployment mode
+
+The hosted wrapper lives entirely under `deploy/openwork-server/`.
+
+Root scripts for hosted operations:
+
+```bash
+npm run deploy:build
+npm run deploy:run
+npm run deploy:dev
+npm run deploy:compose
+```
+
+Typical setup:
+
+```bash
+cp deploy/openwork-server/.env.example deploy/openwork-server/.env
+npm run deploy:build
+npm run deploy:compose
+```
+
+For a local hosted dev loop against a bind-mounted checkout:
+
+```bash
+npm run deploy:dev
+```
+
+Use these files as the hosted source of truth:
+
+- `deploy/openwork-server/README.md`
+- `deploy/openwork-server/Dockerfile`
+- `deploy/openwork-server/entrypoint.sh`
+- `deploy/openwork-server/docker-compose.yml`
+- `deploy/openwork-server/opencode.jsonc`
+- `.github/workflows/build-and-deploy.yml`
 
 ### Tool usage
 
@@ -106,6 +170,81 @@ Supporting assets:
 
 - `schemas/` contains the JSON schemas used for validation.
 - `agents/` contains the installed OpenCode agent markdown definitions copied into the package.
+
+## Testing
+
+### Offline-only test commands
+
+These commands do not require a running OpenCode server:
+
+```bash
+npm run test
+npm run test:unit
+npm run test:regression
+npm run eval:tier1
+```
+
+### Live OpenCode-dependent commands
+
+These commands are **not** self-contained from this repo alone. They require a running local OpenCode server plus whatever non-repo OpenCode/provider configuration that server needs on your machine.
+
+```bash
+npm run test:integration
+npm run test:all
+npm run eval:tier2
+npm run eval:baseline
+```
+
+Why:
+- every file under `tests/integration/` creates an SDK client with `process.env.OPENCODE_URL ?? "http://127.0.0.1:4098"`
+- `src/tool-runtime.ts` uses the same default, with `OPENCODE_BASE_URL` accepted as an alias
+- `scripts/run-eval.mjs` uses the same live endpoint for Tier 2 (`--mode judge`) and compare/baseline runs
+
+### Local live integration-test flow
+
+Minimum prerequisites:
+- `npm install`
+- local OpenCode CLI/runtime installed and available as `opencode`
+- usable OpenCode/provider configuration outside this repo if your local OpenCode setup requires it
+
+Install Corina's local agents from the repo root:
+
+```bash
+npm run install-corina
+```
+
+Start the local OpenCode server from the repo root:
+
+```bash
+opencode serve --hostname 127.0.0.1 --port 4098 --print-logs
+```
+
+In another shell, verify the server:
+
+```bash
+curl -fsS http://127.0.0.1:4098/global/health
+```
+
+Then run the live integration suite, the full suite, or a specific live test file:
+
+```bash
+OPENCODE_URL=http://127.0.0.1:4098 npm run test:integration
+OPENCODE_URL=http://127.0.0.1:4098 npm run test:all
+OPENCODE_URL=http://127.0.0.1:4098 npx vitest run tests/integration/pipeline.e2e.test.ts
+```
+
+Environment and defaults:
+- default live endpoint: `http://127.0.0.1:4098`
+- primary env var: `OPENCODE_URL`
+- runtime alias used by `src/tool-runtime.ts`: `OPENCODE_BASE_URL`
+- expected local port in repo docs/tests: `4098`
+
+Current truth:
+- the local OpenCode live path is documented and validated at `http://127.0.0.1:4098`
+- `test:integration` is green under that validated setup
+- `test:all` is green under that validated setup
+- `npm run test:all` still includes the live integration tests, so it will fail if no OpenCode server is running at the configured URL
+- live-path results are still not fully self-contained from this repo alone because they depend on OpenCode/runtime/provider setup behind that server
 
 ## Contributing
 

@@ -17,7 +17,7 @@ Generated: 2026-04-10
 ### Voice prompts
 - `~/.config/opencode/prompts/voices/accessibility.txt`
 - `~/.config/opencode/prompts/voices/brand.txt`
-- `~/.config/opencode/prompts/voices/email.txt`
+- `~/.config/opencode/prompts/voices/commercial-email.txt`
 - `~/.config/opencode/prompts/voices/executive.txt`
 - `~/.config/opencode/prompts/voices/journalist.txt`
 - `~/.config/opencode/prompts/voices/personal.txt`
