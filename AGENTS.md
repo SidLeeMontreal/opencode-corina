@@ -17,34 +17,41 @@ User
 
 ## Agent Roster
 
-| Agent | Mode | Role |
-|---|---|---|
-| corina | primary | Front-facing writer. Owns conversation. Delegates to tools and subagents. |
-| prose-evaluator | subagent | Universal prose-quality evaluator for critique and audit runs. |
-| voice-evaluator | subagent | Voice-alignment evaluator for critique and audit runs. |
-| evidence-evaluator | subagent | Evidence-integrity evaluator for critique and audit runs. |
-| format-auditor | subagent | Deterministic formatting evaluator for audit runs. |
-| critic-adjudicator | subagent | Aggregates modular evaluator findings into final quality, audience, rubric, or compare critique output. |
-| auditor-adjudicator | subagent | Aggregates modular evaluator findings into final audit output. |
-| detector | subagent | LLM-based AI detection judge (Layer 2). Invoked by the `detect` tool. |
-| tone-writer | subagent | Voice application. Invoked by the `tone` tool. |
-| tone-validator | subagent | Validates tone rewrite quality. Invoked by the `tone` tool. |
-| concise-auditor | subagent | Document orchestrator for `/corina-concise` Pass A. |
-| concise-reviser | subagent | Paragraph-window reviser for `/corina-concise` Pass B. |
-| concise-stitcher | subagent | Stitch pass for `/corina-concise` Pass C. |
-| concise-reconciler | subagent | Reconciliation pass for `/corina-concise` Pass D. |
+Primary
+- `corina` — Front-facing writer and orchestrator.
 
-All subagents are hidden (not in @autocomplete). They are invoked programmatically via the Task tool only.
+Critique / Audit
+- `prose-evaluator` — Prose-quality evaluator.
+- `voice-evaluator` — Voice-alignment evaluator.
+- `evidence-evaluator` — Evidence-integrity evaluator.
+- `format-auditor` — Deterministic formatting evaluator.
+- `critic-adjudicator` — Final critique aggregator.
+- `auditor-adjudicator` — Final audit aggregator.
+
+Detection
+- `detector` — LLM-based AI detection judge. Used by `detect`.
+
+Tone
+- `tone-writer` — Applies voice.
+- `tone-validator` — Validates tone rewrite quality.
+
+Concision
+- `concise-auditor` — Pass A orchestrator.
+- `concise-reviser` — Pass B reviser.
+- `concise-stitcher` — Pass C stitcher.
+- `concise-reconciler` — Pass D reconciler.
+
+Rule
+- All subagents are hidden (not in @autocomplete) and callable only via the Task tool.
+
 
 ## Tool Roster
 
-| Tool | File | Description |
-|---|---|---|
-| `write` | `.opencode/tools/write.ts` | Full 5-step gated editorial pipeline |
-| `tone` | `.opencode/tools/tone.ts` | Voice/tone rewriter (11 voices) |
-| `detect` | `.opencode/tools/detect.ts` | AI-pattern detector (Layer 1 + Layer 2) |
-| `critique` | `.opencode/tools/critique.ts` | Quality / audience / rubric / compare modes |
-| `concise` | `.opencode/tools/concise.ts` | Text concision — removes fluff, preserves substance (quick + full modes) |
+- `write` — `.opencode/tools/write.ts` — Full 5-step gated editorial pipeline
+- `tone` — `.opencode/tools/tone.ts` — Voice/tone rewriter with 11 voices
+- `detect` — `.opencode/tools/detect.ts` — AI-pattern detector with Layer 1 and Layer 2 analysis
+- `critique` — `.opencode/tools/critique.ts` — Quality, audience, rubric, and compare modes
+- `concise` — `.opencode/tools/concise.ts` — Reduces fluff while preserving substance; supports quick and full modes
 
 Tools are standalone files. They load independently of the plugin.
 The plugin (`src/index.ts`) observes all tool calls via `tool.execute.after` for logging and audit.

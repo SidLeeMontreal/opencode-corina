@@ -1,0 +1,6 @@
+{
+  "version": "0.2",
+  "language": "en-US",
+  "words": ["overcorrect"],
+  "ignorePaths": ["node_modules/**", "dist/**", "deps/**", "package-lock.json"]
+}
