@@ -114,14 +114,25 @@ Use these files as the hosted source of truth:
 
 ### Tool usage
 
-The plugin registers custom tools including `write`.
+The plugin registers custom tools including `draft`.
+
+`draft` is the public authoring boundary. It returns a structured envelope by default:
+
+- `artifact` is canonical content for persistence
+- `rendered` is presentation output for chat/UI display
+- `outcome` is the authoritative status
+- `should_persist` tells downstream callers whether `artifact.final_content` should be saved
 
 Example call shape:
 
 ```ts
-await ctx.callTool("write", {
+const output = await ctx.callTool("draft", {
   brief: "Write a sharp article for CTOs on why AI governance fails when it is owned only by legal."
 });
+
+if (output.should_persist && output.artifact) {
+  const canonicalDraft = output.artifact.final_content;
+}
 ```
 
 At the moment, the internal step runners are scaffolded with stub implementations and clear TODO markers showing where OpenCode SDK model calls should be added.
@@ -141,7 +152,7 @@ Builds a `DraftArtifact` and runs a banned-words pre-scan before moving forward.
 Runs up to two critique passes using a `CritiqueArtifact`. If the critique fails, the draft is revised and validated again.
 
 ### 5. Final audit
-Runs an `AuditArtifact` check and returns either final content or the content plus a warning block.
+Runs an `AuditArtifact` check and returns a structured draft envelope where canonical content lives in `artifact.final_content` and presentation output lives in `rendered`.
 
 ## Architecture overview
 
@@ -324,4 +335,3 @@ See `CHANGELOG-prompts.md`. In short:
 - patch: no intended behavior change
 - minor: prompt tuning or new prompt assets
 - major: persona, rubric, or output-contract changes
-

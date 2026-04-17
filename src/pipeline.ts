@@ -2,16 +2,16 @@ import { ModelResolver } from "opencode-model-resolver";
 import type { ResolvedModel } from "opencode-model-resolver";
 
 import { writeCapabilityAudit } from "./audit-log.js";
-import { createCapabilityOutput } from "./capability-output.js";
+import { createToolEnvelope } from "./capability-output.js";
 import { deduplicateFindings, normalizeModuleOutput } from "./evaluation-normalizer.js";
 import { buildEvaluationContextFromWorkflowState, selectModules } from "./evaluation-registry.js";
 import { buildEvaluationContextBlock, normalizeBlankLines, runEvaluationAgent } from "./evaluation-runtime.js";
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { DEFAULT_MODEL_CONFIG } from "./model-config.js";
 import { loadPrompt, voicePromptRelativePath } from "./prompt-loader.js";
-import { runBriefIntake, runCritique, runDraft, runOutline, runRevise } from "./steps.js";
+import { runBriefIntake, runCritique, runDraft as runDraftStep, runOutline, runRevise } from "./steps.js";
 import { inferVoice } from "./tone-defaults.js";
-import type { AgentCapabilityOutput, AuditArtifact, EvaluationFinding, EvaluationModuleId, ModuleRunStatus, OpenCodeClient, PipelineModelConfig, WorkflowState } from "./types.js";
+import type { AuditArtifact, CorinaToolEnvelope, DraftToolArtifact, EvaluationFinding, EvaluationModuleId, ModuleRunStatus, OpenCodeClient, PipelineModelConfig, WorkflowState } from "./types.js";
 import { validate } from "./validators.js";
 
 export function mergeModelConfig(modelConfig?: Partial<PipelineModelConfig>): PipelineModelConfig {
@@ -243,7 +243,7 @@ export async function runPipelineWithArtifact(
   client: OpenCodeClient,
   modelConfig?: Partial<PipelineModelConfig>,
   logger: AgentLogger = makeConsoleLogger("corina"),
-): Promise<AgentCapabilityOutput<{ final_content: string; audit: AuditArtifact }>> {
+): Promise<CorinaToolEnvelope<DraftToolArtifact>> {
   const startMs = Date.now();
   const usage = createUsageAccumulator();
   const state: WorkflowState = {
@@ -302,12 +302,14 @@ export async function runPipelineWithArtifact(
         assumptions_count: state.warnings.length,
       });
 
-      return createCapabilityOutput({
-        capability: "pipeline",
+      return createToolEnvelope<DraftToolArtifact>({
+        capability: "draft",
+        outcome: "degraded",
+        shouldPersist: true,
         inputSummary: buildInputSummary(brief, state),
         artifact: { final_content: rendered, audit },
         rendered,
-        assumptions: state.warnings,
+        warnings: state.warnings,
         metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
       });
     }
@@ -340,7 +342,7 @@ export async function runPipelineWithArtifact(
 
     const draftModel = await resolver.resolveStepModel(config.draft, config.provider);
     const { result: draftResult } = await runStep(logger, "draft", draftModel.modelID, () =>
-      runDraft(client, state.briefArtifact!, state.outlineArtifact!, draftModel, logger, usage),
+      runDraftStep(client, state.briefArtifact!, state.outlineArtifact!, draftModel, logger, usage),
     );
     state.draftArtifact = draftResult.artifact;
     state.requested_voice = inferVoice(state.draftArtifact.content);
@@ -402,11 +404,12 @@ export async function runPipelineWithArtifact(
       throw new Error(`AuditArtifact validation failed: ${auditValidation.errors.join("; ")}`);
     }
 
+    const canonicalContent = state.auditArtifact.final_content ?? state.draftArtifact!.content;
     const rendered =
       state.auditArtifact.approved_for_delivery && state.auditArtifact.final_content
         ? state.auditArtifact.final_content
         : [
-            state.draftArtifact.content,
+            state.draftArtifact!.content,
             "",
             "[Corina warning]",
             state.auditArtifact.publishability_note,
@@ -436,18 +439,23 @@ export async function runPipelineWithArtifact(
       assumptions_count: state.warnings.length,
     });
 
-    return createCapabilityOutput({
-      capability: "pipeline",
+    return createToolEnvelope<DraftToolArtifact>({
+      capability: "draft",
+      outcome: state.auditArtifact.approved_for_delivery ? "success" : "degraded",
+      shouldPersist: true,
       inputSummary: buildInputSummary(brief, state),
       artifact: {
-        final_content: state.auditArtifact.final_content ?? rendered,
+        final_content: canonicalContent,
         audit: state.auditArtifact,
       },
       rendered,
-      assumptions: state.warnings,
+      warnings: state.warnings,
       metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
     });
   } catch (error) {
+    const rendered = `Corina draft failed: ${error instanceof Error ? error.message : String(error)}`;
+    const inputSummary = buildInputSummary(brief, state);
+    const warnings = [...state.warnings, rendered];
     writeCapabilityAudit({
       capability: "pipeline",
       input_summary: buildCapabilityInputSummary(inputWordCount),
@@ -462,8 +470,26 @@ export async function runPipelineWithArtifact(
       degraded: false,
       ...errorDetails(error),
     });
-    throw error;
+    return createToolEnvelope<DraftToolArtifact>({
+      capability: "draft",
+      outcome: "failed",
+      shouldPersist: false,
+      artifact: null,
+      rendered,
+      warnings,
+      inputSummary,
+      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+    });
   }
+}
+
+export async function runDraftWithArtifact(
+  brief: string,
+  client: OpenCodeClient,
+  modelConfig?: Partial<PipelineModelConfig>,
+  logger?: AgentLogger,
+): Promise<CorinaToolEnvelope<DraftToolArtifact>> {
+  return runPipelineWithArtifact(brief, client, modelConfig, logger);
 }
 
 export async function runPipeline(
@@ -474,4 +500,13 @@ export async function runPipeline(
 ): Promise<string> {
   const output = await runPipelineWithArtifact(brief, client, modelConfig, logger);
   return output.rendered;
+}
+
+export async function runDraft(
+  brief: string,
+  client: OpenCodeClient,
+  modelConfig?: Partial<PipelineModelConfig>,
+  logger?: AgentLogger,
+): Promise<string> {
+  return runPipeline(brief, client, modelConfig, logger);
 }

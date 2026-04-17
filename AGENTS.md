@@ -47,7 +47,7 @@ Rule
 
 ## Tool Roster
 
-- `write` — `.opencode/tools/write.ts` — Full 5-step gated editorial pipeline
+- `draft` — `.opencode/tools/draft.ts` — Full 5-step gated editorial pipeline with structured public envelope
 - `tone` — `.opencode/tools/tone.ts` — Voice/tone rewriter with 11 voices
 - `detect` — `.opencode/tools/detect.ts` — AI-pattern detector with Layer 1 and Layer 2 analysis
 - `critique` — `.opencode/tools/critique.ts` — Quality, audience, rubric, and compare modes
@@ -62,7 +62,7 @@ The plugin is observability infrastructure only. It does **not** implement tools
 
 Responsibilities:
 - `server.connected` → log `plugin_loaded`
-- `tool.execute.after` → log `tool_complete`, write capability audit entry for `write`/`tone`/`detect`/`critique` tools
+- `tool.execute.after` → log `tool_complete`, write capability audit entry for `draft`/`tone`/`detect`/`critique` tools
 - `session.idle` → write `session_idle` audit entry
 - Future: `tool.execute.before` for guardrails and quota enforcement
 
@@ -85,10 +85,12 @@ Loader: `src/prompt-loader.ts` (checks override dir first, falls back to bundled
 ## Orchestration Rules
 
 1. Corina does not write content directly — she always calls a tool.
-2. Tools execute synchronously today — async job support is planned for OpenWork integration.
-3. Chain calls (`--chain`) are handled inside the tool execution layer.
-4. Subagents are spawned per-session; they do not share state.
-5. `corina.md` declares `permission.task` to control which subagents can be invoked.
+2. For authoring requests, Corina routes through `draft`.
+3. In public tool responses, `artifact` is canonical, `rendered` is presentation, `outcome` is authoritative, and `should_persist` governs persistence.
+4. Tools execute synchronously today — async job support is planned for OpenWork integration.
+5. Chain calls (`--chain`) are handled inside the tool execution layer.
+6. Subagents are spawned per-session; they do not share state.
+7. `corina.md` declares `permission.task` to control which subagents can be invoked.
 
 ## Subagent Invocation (Task tool)
 
@@ -122,7 +124,7 @@ Every tool must return output for every valid input.
 ## Future: OpenWork Integration
 
 When async job execution is added:
-- `write`, `tone`, `detect`, `critique`, `concise` tools gain `submit_*_job` / `get_*_job_status` variants
+- `draft`, `tone`, `detect`, `critique`, `concise` tools gain `submit_*_job` / `get_*_job_status` variants
 - Tools return a job receipt immediately; result is fetched when ready
 - Plugin gains a `job.status.updated` event handler to surface results
 - Standalone tool files make this swap possible without touching the plugin

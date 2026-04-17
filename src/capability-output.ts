@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 
 import type { AgentCapabilityOutput } from "opencode-text-tools";
 
+import type { CorinaToolEnvelope, ToolOutcome } from "./types.js";
+
 const PACKAGE_VERSION = (() => {
   try {
     const packageJsonPath = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
@@ -19,6 +21,25 @@ const PACKAGE_VERSION = (() => {
     return "0.0.0";
   }
 })();
+
+function buildBaseEnvelope(options: {
+  capability: string;
+  inputSummary: string;
+  rendered: string;
+  metrics?: { total_tokens?: number; total_cost?: number };
+}) {
+  const { capability, inputSummary, rendered, metrics } = options;
+
+  return {
+    agent: "corina" as const,
+    capability,
+    version: PACKAGE_VERSION,
+    timestamp: new Date().toISOString(),
+    input_summary: inputSummary,
+    rendered,
+    ...(metrics ? { metrics } : {}),
+  };
+}
 
 export function createCapabilityOutput<T>(options: {
   capability: string;
@@ -33,16 +54,38 @@ export function createCapabilityOutput<T>(options: {
   const { capability, mode, inputSummary, artifact, rendered, chainedTo, assumptions, metrics } = options;
 
   return {
-    agent: "corina",
-    capability,
+    ...buildBaseEnvelope({ capability, inputSummary, rendered, metrics }),
     ...(mode ? { mode } : {}),
-    version: PACKAGE_VERSION,
-    timestamp: new Date().toISOString(),
-    input_summary: inputSummary,
     artifact,
-    rendered,
     ...(chainedTo ? { chained_to: chainedTo } : {}),
     ...(assumptions?.length ? { assumptions } : {}),
-    ...(metrics ? { metrics } : {}),
   };
 }
+
+export function createToolEnvelope<TArtifact>(options: {
+  capability: string;
+  outcome: ToolOutcome;
+  shouldPersist: boolean;
+  artifact: TArtifact | null;
+  rendered: string;
+  warnings?: string[];
+  inputSummary: string;
+  metrics?: { total_tokens?: number; total_cost?: number };
+  chainedTo?: string;
+  chainResult?: unknown;
+}): CorinaToolEnvelope<TArtifact> {
+  const { capability, outcome, shouldPersist, artifact, rendered, warnings, inputSummary, metrics, chainedTo, chainResult } = options;
+
+  return {
+    ...buildBaseEnvelope({ capability, inputSummary, rendered, metrics }),
+    outcome,
+    should_persist: shouldPersist,
+    artifact,
+    warnings: warnings ?? [],
+    metrics: metrics ?? {},
+    ...(chainedTo ? { chained_to: chainedTo } : {}),
+    ...(chainResult !== undefined ? { chain_result: chainResult } : {}),
+  };
+}
+
+export { PACKAGE_VERSION };
