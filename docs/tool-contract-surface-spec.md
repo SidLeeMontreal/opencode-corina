@@ -154,9 +154,8 @@ Rules:
 - It is diagnostic, not authoring output.
 
 #### `concise`
-- Must be defined explicitly during rollout.
-- If treated as canonical rewritten copy, set `should_persist = true`.
-- If treated as advisory analysis only, set `should_persist = false`.
+- `should_persist = true` when `outcome` is `success` or `degraded` and the concise artifact contains canonical rewritten copy.
+- Canonical concise content is consumed from the artifact, not from `rendered`.
 
 ---
 

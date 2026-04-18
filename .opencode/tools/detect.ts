@@ -13,7 +13,7 @@ const logger = makeConsoleLogger("detect-tool")
 
 export default tool({
   description:
-    "Detect AI-writing patterns in text. Returns annotated analysis, confidence scores, severity flags, and actionable fix suggestions. Never rewrites — diagnostic only. All params optional except text.",
+    "Detect AI-writing patterns in text. Returns the shared structured envelope by default, with the detection report in artifact, presentation output in rendered, top-level outcome, and should_persist=false. Never rewrites — diagnostic only. All params optional except text.",
   args: {
     text: tool.schema.string().describe("Text to analyze or a readable file path."),
     format: tool.schema.string().optional(),

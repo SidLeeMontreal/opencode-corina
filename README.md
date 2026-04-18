@@ -128,14 +128,24 @@ Use these files as the hosted source of truth:
 
 ### Tool usage
 
-The plugin registers custom tools including `draft`.
+The plugin registers custom tools including `draft`, `tone`, `detect`, `critique`, and `concise`.
 
-`draft` is the public authoring boundary. It returns a structured envelope by default:
+All public tools now return a structured envelope by default:
 
-- `artifact` is canonical content for persistence
+- `artifact` is canonical machine-readable output
 - `rendered` is presentation output for chat/UI display
-- `outcome` is the authoritative status
-- `should_persist` tells downstream callers whether `artifact.final_content` should be saved
+- `outcome` is the authoritative top-level status
+- `should_persist` tells downstream callers whether the canonical artifact should be saved for the tool's public purpose
+
+Per-tool persistence semantics:
+
+- `draft` → persistable authoring output when `should_persist = true`, using `artifact.final_content`
+- `tone` → persistable rewrite output when `should_persist = true`, using `artifact.final_content`
+- `concise` → persistable rewrite output when `should_persist = true`, using `artifact.revised_draft`
+- `critique` → advisory report output, `should_persist = false`
+- `detect` → diagnostic report output, `should_persist = false`
+
+Valid degraded outcomes are part of the public contract. A degraded result can still carry a canonical artifact and remain usable for downstream callers.
 
 Example call shape:
 
@@ -146,6 +156,17 @@ const output = await ctx.callTool("draft", {
 
 if (output.should_persist && output.artifact) {
   const canonicalDraft = output.artifact.final_content;
+}
+```
+
+```ts
+const critique = await ctx.callTool("critique", {
+  texts: ["A draft to evaluate"],
+  mode: "quality",
+});
+
+if (critique.outcome === "degraded" && critique.artifact) {
+  // Still consume artifact as the canonical report.
 }
 ```
 
@@ -166,7 +187,7 @@ Builds a `DraftArtifact` and runs a banned-words pre-scan before moving forward.
 Runs up to two critique passes using a `CritiqueArtifact`. If the critique fails, the draft is revised and validated again.
 
 ### 5. Final audit
-Runs an `AuditArtifact` check and returns a structured draft envelope where canonical content lives in `artifact.final_content` and presentation output lives in `rendered`.
+Runs an `AuditArtifact` check and returns a structured draft envelope where canonical content lives in `artifact.final_content`, presentation output lives in `rendered`, `outcome` is top-level, and `should_persist` governs downstream persistence.
 
 ## Architecture overview
 
