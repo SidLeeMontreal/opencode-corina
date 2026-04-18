@@ -58,10 +58,10 @@ Rule
 ## Tool Roster
 
 - `draft` — `.opencode/tools/draft.ts` — Full 5-step gated editorial pipeline with structured public envelope
-- `tone` — `.opencode/tools/tone.ts` — Voice/tone rewriter with 11 voices
-- `detect` — `.opencode/tools/detect.ts` — AI-pattern detector with Layer 1 and Layer 2 analysis
-- `critique` — `.opencode/tools/critique.ts` — Quality, audience, rubric, and compare modes
-- `concise` — `.opencode/tools/concise.ts` — Reduces fluff while preserving substance; supports quick and full modes
+- `tone` — `.opencode/tools/tone.ts` — Voice/tone rewriter with 11 voices; canonical rewrite artifact, persistable on success/degraded
+- `detect` — `.opencode/tools/detect.ts` — AI-pattern detector with Layer 1 and Layer 2 analysis; diagnostic artifact, not persistable
+- `critique` — `.opencode/tools/critique.ts` — Quality, audience, rubric, and compare modes; advisory artifact, not persistable
+- `concise` — `.opencode/tools/concise.ts` — Reduces fluff while preserving substance; canonical rewrite artifact, persistable on success/degraded
 
 Tools are standalone files. They load independently of the plugin.
 The plugin (`src/index.ts`) observes all tool calls via `tool.execute.after` for logging and audit.
@@ -97,10 +97,11 @@ Loader: `src/prompt-loader.ts` (checks override dir first, falls back to bundled
 1. Corina does not write content directly — she always calls a tool.
 2. For authoring requests, Corina routes through `draft`.
 3. In public tool responses, `artifact` is canonical, `rendered` is presentation, `outcome` is authoritative, and `should_persist` governs persistence.
-4. Tools execute synchronously today — async job support is planned for OpenWork integration.
-5. Chain calls (`--chain`) are handled inside the tool execution layer.
-6. Subagents are spawned per-session; they do not share state.
-7. `corina.md` declares `permission.task` to control which subagents can be invoked.
+4. Valid degraded outcomes are part of the public contract. Callers consume canonical data from `artifact`, never recover it from `rendered`.
+5. Tools execute synchronously today — async job support is planned for OpenWork integration.
+6. Chain calls (`--chain`) are handled inside the tool execution layer.
+7. Subagents are spawned per-session; they do not share state.
+8. `corina.md` declares `permission.task` to control which subagents can be invoked.
 
 ## Subagent Invocation (Task tool)
 

@@ -13,7 +13,7 @@ const logger = makeConsoleLogger("tone-tool")
 
 export default tool({
   description:
-    "Rewrite content in a specified voice and format using Corina. Supports 11 voices: journalist, technical, persuasive, social, ux, seo, accessibility, executive, brand, email, personal. All params optional — Corina infers missing ones.",
+    "Rewrite content in a specified voice and format using Corina. Returns the shared structured envelope by default, with canonical rewritten text in artifact.final_content, presentation output in rendered, top-level outcome, and should_persist=true for usable rewrites. Supports 11 voices: journalist, technical, persuasive, social, ux, seo, accessibility, executive, brand, email, personal. All params optional — Corina infers missing ones.",
   args: {
     text: tool.schema.string().min(1),
     voice: tool.schema.string().optional(),

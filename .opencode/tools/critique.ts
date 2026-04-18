@@ -13,7 +13,7 @@ const logger = makeConsoleLogger("critique-tool")
 
 export default tool({
   description:
-    "Critique text quality (quality), evaluate for a specific audience (audience), score against a rubric (rubric), or rank N versions (compare). All modes return typed artifacts. All params optional — Corina infers missing ones.",
+    "Critique text quality (quality), evaluate for a specific audience (audience), score against a rubric (rubric), or rank N versions (compare). Returns the shared structured envelope by default, with the critique report in artifact, presentation output in rendered, top-level outcome, and should_persist=false. All params optional — Corina infers missing ones.",
   args: {
     texts: tool.schema.array(tool.schema.string()),
     mode: tool.schema.string().optional(),
