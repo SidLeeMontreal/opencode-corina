@@ -20,7 +20,7 @@ export default tool({
   },
   async execute({ text, mode, target_words, format }, context) {
     const client = createToolRuntimeClient(context);
-    const output = await runConciseWithArtifact(
+    return runConciseWithArtifact(
       {
         text,
         mode: mode as "quick" | "full" | "auto" | undefined,
@@ -30,7 +30,5 @@ export default tool({
       client,
       logger,
     );
-
-    return format === "json" ? JSON.stringify(output, null, 2) : output.rendered;
   },
 });

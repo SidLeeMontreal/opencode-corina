@@ -24,7 +24,6 @@ export default tool({
   },
   async execute({ text, format, autoFix, chain, voice, modelPreset }, context) {
     const client = createToolRuntimeClient(context)
-    const output = await runDetectWithArtifact({ text, format: format as any, autoFix, chain: chain as any, voice, modelPreset }, client, logger)
-    return format === "json" ? JSON.stringify(output, null, 2) : output.rendered
+    return runDetectWithArtifact({ text, format: format as any, autoFix, chain: chain as any, voice, modelPreset }, client, logger)
   },
 })

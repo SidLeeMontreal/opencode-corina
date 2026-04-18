@@ -7,7 +7,7 @@ import type { ResolvedModel } from "opencode-model-resolver";
 import { detectAiPatterns } from "opencode-text-tools";
 
 import { writeCapabilityAudit, writeChainAudit } from "./audit-log.js";
-import { createCapabilityOutput } from "./capability-output.js";
+import { createCapabilityOutput, createToolEnvelope, createToolEnvelopeFromCapabilityOutput } from "./capability-output.js";
 import {
   addLlmMetrics,
   createUsageAccumulator,
@@ -37,6 +37,7 @@ import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
 import type {
   AgentCapabilityOutput,
   AudienceCritiqueReport,
+  CorinaToolEnvelope,
   ComparisonReport,
   CritiqueArtifact,
   CritiqueArtifactUnion,
@@ -301,6 +302,22 @@ function inferCritiqueOutcome(output: AgentCapabilityOutput<CritiqueArtifactUnio
   }
 
   return "success";
+}
+
+function toCritiqueToolEnvelope(output: AgentCapabilityOutput<CritiqueArtifactUnion> & {
+  input_summary?: string;
+  chained_to?: string;
+  chain_result?: unknown;
+  metrics?: { total_tokens?: number; total_cost?: number };
+}): CorinaToolEnvelope<CritiqueArtifactUnion> {
+  const outcome = inferCritiqueOutcome(output);
+  return createToolEnvelopeFromCapabilityOutput({
+    capability: "critique",
+    output,
+    outcome,
+    shouldPersist: false,
+    warnings: outcome === "degraded" ? (output.assumptions ?? []) : [],
+  });
 }
 
 function inferChainOutcome(output: AgentCapabilityOutput<unknown>): "success" | "degraded" {
@@ -1362,7 +1379,7 @@ export async function runCritiqueWithArtifact(
   options: RunCritiqueOptions,
   client: OpenCodeClient,
   logger: AgentLogger = makeConsoleLogger("corina"),
-): Promise<AgentCapabilityOutput<CritiqueArtifactUnion>> {
+): Promise<CorinaToolEnvelope<CritiqueArtifactUnion>> {
   const startMs = Date.now();
   const usage = createUsageAccumulator();
   const normalized = await normalizeCritiqueInputs(inputs, options);
@@ -1406,7 +1423,7 @@ export async function runCritiqueWithArtifact(
       total_cost: usage.total_cost,
       assumptions_count: assumptions.length,
     });
-    return finalized;
+    return toCritiqueToolEnvelope(finalized);
   }
 
   if (normalized.mode === "quality") {
@@ -1447,7 +1464,7 @@ export async function runCritiqueWithArtifact(
       total_cost: usage.total_cost,
       assumptions_count: output.assumptions?.length ?? 0,
     });
-    return output;
+    return toCritiqueToolEnvelope(output);
   }
 
   if (normalized.mode === "audience") {
@@ -1492,7 +1509,7 @@ export async function runCritiqueWithArtifact(
       total_cost: usage.total_cost,
       assumptions_count: output.assumptions?.length ?? 0,
     });
-    return output;
+    return toCritiqueToolEnvelope(output);
   }
 
   if (normalized.mode === "rubric") {
@@ -1533,7 +1550,7 @@ export async function runCritiqueWithArtifact(
       total_cost: usage.total_cost,
       assumptions_count: output.assumptions?.length ?? 0,
     });
-    return output;
+    return toCritiqueToolEnvelope(output);
   }
 
   const reports: Array<{
@@ -1593,7 +1610,7 @@ export async function runCritiqueWithArtifact(
     total_cost: usage.total_cost,
     assumptions_count: output.assumptions?.length ?? 0,
   });
-  return output;
+  return toCritiqueToolEnvelope(output);
   } catch (error) {
     writeCapabilityAudit({
       capability: "critique",
@@ -1611,7 +1628,17 @@ export async function runCritiqueWithArtifact(
       degraded: false,
       ...errorDetails(error),
     });
-    throw error;
+    const rendered = `Corina critique failed: ${error instanceof Error ? error.message : String(error)}`;
+    return createToolEnvelope<CritiqueArtifactUnion>({
+      capability: "critique",
+      outcome: "failed",
+      shouldPersist: false,
+      artifact: null,
+      rendered,
+      warnings: [...new Set([...assumptions, rendered])],
+      inputSummary: capabilityInputSummary,
+      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+    });
   }
 }
 

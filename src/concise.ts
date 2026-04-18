@@ -1,4 +1,4 @@
-import { createCapabilityOutput } from "./capability-output.js";
+import { createCapabilityOutput, createToolEnvelope, createToolEnvelopeFromCapabilityOutput } from "./capability-output.js";
 import { writeCapabilityAudit } from "./audit-log.js";
 import {
   addLlmMetrics,
@@ -13,6 +13,7 @@ import { loadPrompt } from "./prompt-loader.js";
 import type {
   AgentCapabilityOutput,
   ConciseArtifact,
+  CorinaToolEnvelope,
   HeatMapEntry,
   OpenCodeClient,
   ParagraphFunctionEntry,
@@ -956,7 +957,7 @@ export async function runConciseWithArtifact(
   args: ConciseArgs,
   client: OpenCodeClient,
   logger: AgentLogger = makeConsoleLogger("concise"),
-): Promise<AgentCapabilityOutput<ConciseArtifact>> {
+): Promise<CorinaToolEnvelope<ConciseArtifact>> {
   const mode = detectMode(args.text, args.mode);
   const usage = createUsageAccumulator();
   const startMs = Date.now();
@@ -985,7 +986,13 @@ export async function runConciseWithArtifact(
       assumptions_count: output.assumptions?.length ?? 0,
     });
 
-    return output;
+    return createToolEnvelopeFromCapabilityOutput({
+      capability: "concise",
+      output,
+      outcome: output.assumptions?.length ? "degraded" : "success",
+      shouldPersist: true,
+      warnings: output.assumptions?.length ? output.assumptions : [],
+    });
   } catch (error) {
     writeCapabilityAudit({
       capability: "concise",
@@ -1003,7 +1010,17 @@ export async function runConciseWithArtifact(
       degraded: false,
       ...errorDetails(error),
     });
-    throw error;
+    const rendered = `Corina concise failed: ${error instanceof Error ? error.message : String(error)}`;
+    return createToolEnvelope<ConciseArtifact>({
+      capability: "concise",
+      outcome: "failed",
+      shouldPersist: false,
+      artifact: null,
+      rendered,
+      warnings: [rendered],
+      inputSummary: buildCapabilityInputSummary(countWords(args.text), mode),
+      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+    });
   }
 }
 

@@ -88,4 +88,33 @@ export function createToolEnvelope<TArtifact>(options: {
   };
 }
 
+export function createToolEnvelopeFromCapabilityOutput<TArtifact>(options: {
+  capability: string;
+  output: AgentCapabilityOutput<TArtifact> & {
+    input_summary?: string;
+    chained_to?: string;
+    chain_result?: unknown;
+    metrics?: { total_tokens?: number; total_cost?: number };
+  };
+  outcome: ToolOutcome;
+  shouldPersist: boolean;
+  warnings?: string[];
+  artifact?: TArtifact | null;
+}): CorinaToolEnvelope<TArtifact> {
+  const { capability, output, outcome, shouldPersist, warnings, artifact } = options;
+
+  return createToolEnvelope({
+    capability,
+    outcome,
+    shouldPersist,
+    artifact: artifact === undefined ? output.artifact : artifact,
+    rendered: output.rendered,
+    warnings,
+    inputSummary: output.input_summary ?? "",
+    metrics: output.metrics,
+    chainedTo: output.chained_to,
+    chainResult: output.chain_result,
+  });
+}
+
 export { PACKAGE_VERSION };

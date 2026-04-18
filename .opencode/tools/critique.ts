@@ -26,12 +26,11 @@ export default tool({
   },
   async execute({ texts, mode, audience, rubric, chain, format, modelPreset, voice }, context) {
     const client = createToolRuntimeClient(context)
-    const output = await runCritiqueWithArtifact(
+    return runCritiqueWithArtifact(
       texts,
       { mode: mode as any, audience, rubric, chain: chain as any, format: format as any, modelPreset, voice },
       client,
       logger,
     )
-    return format === "json" ? JSON.stringify(output, null, 2) : output.rendered
   },
 })

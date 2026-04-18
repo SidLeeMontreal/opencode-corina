@@ -26,9 +26,7 @@ export default tool({
   },
   async execute(args, context) {
     const client = createToolRuntimeClient(context)
-    const wantsJson = args.format === "json"
-    const toneArgs = wantsJson ? { ...args, format: undefined } : args
-    const output = await runTonePipelineWithArtifact(toneArgs, client, logger)
-    return wantsJson ? JSON.stringify(output, null, 2) : output.rendered
+    const toneArgs = args.format === "json" ? { ...args, format: undefined } : args
+    return runTonePipelineWithArtifact(toneArgs, client, logger)
   },
 })
