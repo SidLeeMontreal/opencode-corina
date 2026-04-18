@@ -1,18 +1,32 @@
 # opencode-corina
 
-Corina is a writing plugin for OpenCode that wraps a gated five-step editorial workflow around a strategic writing agent. The repo root is canonical: it owns Corina capability logic, prompts, schemas, tools, tests, and evals. This repo also includes a hosted deployment wrapper under `deploy/openwork-server/` so the same root runtime can be served through OpenWork.
+Corina is available both as an OpenCode plugin and as a hosted OpenCode Server container.
 
-## Repo modes
+This repository is the orchestrator: it validates structured artifacts, coordinates each stage of the pipeline, and records audit events. The repo root is canonical — it owns Corina capability logic, prompts, schemas, tools, tests, and evals. The hosted deployment wrapper under `deploy/openwork-server/` serves the same root runtime through OpenWork.
 
-This repo operates in two modes:
+## Two deployment modes
 
-1. **plugin/package mode** at repo root
-2. **hosted deployment mode** under `deploy/openwork-server/`
+Corina runs in two distinct runtime surfaces:
 
-Separation of concerns:
+| Mode | Location | What it provides |
+|------|----------|-----------------|
+| **Local plugin** | Repo root (`.opencode/`, `src/`) | OpenCode plugin for local development — tools, agents, and the editorial pipeline run inside your OpenCode session |
+| **Hosted OpenCode Server container** | [`deploy/openwork-server/`](deploy/openwork-server/) | Containerized OpenCode Server exposing an OpenAI-compatible API (`/v1/models`, `/v1/chat/completions`) for hosted/remote use |
 
-- **Repo root**: Corina behavior, editorial pipeline, prompts, schemas, evals, tests, and local `.opencode/` assets
-- **`deploy/openwork-server/`**: container, proxy, OpenWork wiring, and deployment configuration for hosting the root repo
+**Looking for the hosted server?** Go directly to [`deploy/openwork-server/`](deploy/openwork-server/).
+
+## Repository structure
+
+```text
+src/                      # Plugin execution layer (TypeScript)
+.opencode/                # OpenCode plugin config, agents, and tools
+deploy/
+└── openwork-server/      # Hosted OpenCode Server container (Docker)
+evals/                    # Evaluation suites and baselines
+prompts/                  # Versioned prompt assets
+schemas/                  # JSON schemas for artifact validation
+scripts/                  # Build and eval runner scripts
+```
 
 Architecture references:
 
@@ -164,12 +178,16 @@ src/
 ├── validators.ts   # AJV validators for all artifacts
 ├── audit-log.ts    # JSONL audit writer
 └── types.ts        # shared TypeScript interfaces
+
+deploy/
+└── openwork-server/  # hosted OpenCode Server container (OpenAI-compatible /v1 API)
 ```
 
 Supporting assets:
 
 - `schemas/` contains the JSON schemas used for validation.
 - `agents/` contains the installed OpenCode agent markdown definitions copied into the package.
+- `deploy/openwork-server/` contains the hosted server container — see [Two deployment modes](#two-deployment-modes).
 
 ## Testing
 

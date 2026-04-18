@@ -1,13 +1,26 @@
-# Corina OpenWork Deployment
+# Hosted OpenCode Server Container
 
-This directory contains the hosted deployment wrapper for Corina. It does not contain Corina capability logic. The canonical writing/runtime code remains at the repo root.
+Corina is available both as an OpenCode plugin and as a hosted OpenCode Server container. This directory contains the hosted container deployment. It does not contain Corina capability logic — the canonical writing/runtime code remains at the repo root.
 
-## What this deploys
+## What this provides
+
+A containerized OpenCode Server that exposes an OpenAI-compatible API:
+
+- `GET  /v1/models` -- list available models
+- `POST /v1/chat/completions` -- chat completions (streaming and non-streaming)
+
+Runtime details:
 
 - `/workspace` is the Corina repo root
 - OpenWork is fronted by nginx on port `8443`
 - OpenCode sessions are managed by the local gateway on port `3001`
 - The OpenAI-compatible proxy is exposed through `/v1/`
+
+## Relationship to the plugin
+
+The plugin entrypoint at `src/index.ts` runs inside a local OpenCode session and does **not** serve the `/v1` API. The hosted server container in this directory is the only surface that exposes `/v1/models` and `/v1/chat/completions`.
+
+For local plugin development, see the [root README](../../README.md).
 
 ## Files
 

@@ -2,10 +2,20 @@
 
 ## System Overview
 
-Corina is a primary OpenCode agent and editorial writing system.
+Corina is available both as an OpenCode plugin and as a hosted OpenCode Server container.
+
 Distributed as an npm package (`opencode-corina`) and as a local plugin via `.opencode/plugins/corina.ts`.
 
-Orchestration model:
+## Runtime Surfaces
+
+| Surface | Location | Purpose |
+|---------|----------|---------|
+| **OpenCode plugin** | Repo root — `src/`, `.opencode/plugins/`, `.opencode/tools/`, `.opencode/agents/` | Local development: tools, agents, and the editorial pipeline run inside your OpenCode session |
+| **Hosted OpenCode Server container** | `deploy/openwork-server/` | Containerized server exposing `/v1/models` and `/v1/chat/completions` (OpenAI-compatible API) for hosted/remote consumers |
+
+The plugin entrypoint (`src/index.ts`) does **not** serve the `/v1` API surface. The OpenAI-compatible endpoints are provided exclusively by the hosted container in `deploy/openwork-server/`.
+
+Orchestration model (plugin surface):
 
 ```
 User
