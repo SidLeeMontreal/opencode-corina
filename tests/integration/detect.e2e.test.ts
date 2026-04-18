@@ -19,17 +19,20 @@ describe("Detect E2E", { timeout: 600_000 }, () => {
     const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/01-corporate-ai.txt"), "utf8")
     const output = await runDetectWithArtifact({ text, format: "json" }, client)
 
-    expect(output.artifact.overall_score).toBeGreaterThan(0.3)
-    expect(output.artifact.patterns_found.length).toBeGreaterThan(3)
-    expect(["possibly_ai", "likely_ai"]).toContain(output.artifact.verdict)
+    expect(output.capability).toBe("detect")
+    expect(output.should_persist).toBe(false)
+    expect(output.artifact?.overall_score).toBeGreaterThan(0.3)
+    expect(output.artifact?.patterns_found.length).toBeGreaterThan(3)
+    expect(["possibly_ai", "likely_ai"]).toContain(output.artifact?.verdict)
   })
 
   it("returns clean verdict for journalistic text", async () => {
     const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/05-journalistic.txt"), "utf8")
     const output = await runDetectWithArtifact({ text, format: "json" }, client)
 
-    expect(output.artifact.overall_score).toBeLessThan(0.4)
-    expect(["clean", "probably_human"]).toContain(output.artifact.verdict)
+    expect(output.outcome).toBe("success")
+    expect(output.artifact?.overall_score).toBeLessThan(0.4)
+    expect(["clean", "probably_human"]).toContain(output.artifact?.verdict)
   })
 
   it("returns inline format with FLAG markers for AI text", async () => {
@@ -43,8 +46,10 @@ describe("Detect E2E", { timeout: 600_000 }, () => {
   it("handles empty input gracefully", async () => {
     const output = await runDetectWithArtifact({ text: "", format: "report" }, client)
 
-    expect(output.artifact.verdict).toBe("clean")
-    expect(output.artifact.overall_score).toBe(0)
-    expect(output.artifact.patterns_found).toHaveLength(0)
+    expect(output.outcome).toBe("degraded")
+    expect(output.should_persist).toBe(false)
+    expect(output.artifact?.verdict).toBe("clean")
+    expect(output.artifact?.overall_score).toBe(0)
+    expect(output.artifact?.patterns_found).toHaveLength(0)
   })
 })

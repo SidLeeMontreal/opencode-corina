@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createCapabilityOutput } from "./capability-output.js";
+import { createCapabilityOutput, createToolEnvelope, createToolEnvelopeFromCapabilityOutput } from "./capability-output.js";
 import { writeCapabilityAudit } from "./audit-log.js";
 import {
   addLlmMetrics,
@@ -18,6 +18,7 @@ import { loadPrompt, promptExists, PROMPTS_DIR, voicePromptRelativePath } from "
 import type {
   AgentCapabilityOutput,
   BrandProfile,
+  CorinaToolEnvelope,
   OpenCodeClient,
   PersonalVoiceProfile,
   ToneFormat,
@@ -528,7 +529,7 @@ export async function runTonePipelineWithArtifact(
   input: ToneRawInput,
   client: OpenCodeClient,
   logger: AgentLogger = makeConsoleLogger("corina"),
-): Promise<AgentCapabilityOutput<ToneOutputArtifact>> {
+): Promise<CorinaToolEnvelope<ToneOutputArtifact>> {
   const startMs = Date.now();
   const usage = createUsageAccumulator();
   const assumptions: string[] = [];
@@ -578,12 +579,14 @@ export async function runTonePipelineWithArtifact(
       assumptions_count: emptyOutput.assumptions.length,
     });
 
-    return createCapabilityOutput({
+    return createToolEnvelope({
       capability: "tone",
+      outcome: "degraded",
+      shouldPersist: true,
       inputSummary: "Received empty input for tone rewrite.",
       artifact: emptyOutput,
       rendered: emptyOutput.final_content,
-      assumptions: emptyOutput.assumptions,
+      warnings: emptyOutput.assumptions,
       metrics: { total_tokens: 0, total_cost: 0 },
     });
   }
@@ -745,13 +748,22 @@ export async function runTonePipelineWithArtifact(
       assumptions_count: outputArtifact.assumptions.length,
     });
 
-    return createCapabilityOutput({
+    const capabilityOutput = createCapabilityOutput({
       capability: "tone",
       inputSummary: buildInputSummary(inputArtifact),
       artifact: outputArtifact,
       rendered: outputArtifact.final_content,
       assumptions: outputArtifact.assumptions,
       metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+    });
+
+    return createToolEnvelopeFromCapabilityOutput({
+      capability: "tone",
+      output: capabilityOutput,
+      outcome,
+      shouldPersist: true,
+      warnings:
+        outcome === "degraded" ? [...new Set([...outputArtifact.validator_notes, ...outputArtifact.assumptions])] : [],
     });
   } catch (error) {
     writeCapabilityAudit({
@@ -770,7 +782,17 @@ export async function runTonePipelineWithArtifact(
       degraded: false,
       ...errorDetails(error),
     });
-    throw error;
+    const rendered = `Corina tone failed: ${error instanceof Error ? error.message : String(error)}`;
+    return createToolEnvelope<ToneOutputArtifact>({
+      capability: "tone",
+      outcome: "failed",
+      shouldPersist: false,
+      artifact: null,
+      rendered,
+      warnings: [...new Set([...assumptions, rendered])],
+      inputSummary: buildCapabilityInputSummary(countWords(originalText), voice, format),
+      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+    });
   }
 }
 

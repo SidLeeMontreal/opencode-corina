@@ -19,12 +19,15 @@ describe("Tone E2E", { timeout: 600_000 }, () => {
     const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/01-corporate-ai.txt"), "utf8")
     const output = await runTonePipelineWithArtifact({ text, voice: "journalist" }, client)
 
-    expect(output.artifact.final_content).toBeTruthy()
-    expect(output.artifact.final_content.length).toBeGreaterThan(50)
+    expect(output.capability).toBe("tone")
+    expect(["success", "degraded", "failed"]).toContain(output.outcome)
+    expect(typeof output.should_persist).toBe("boolean")
+    expect(output.artifact?.final_content).toBeTruthy()
+    expect((output.artifact?.final_content ?? "").length).toBeGreaterThan(50)
 
     const banned = ["innovative", "leverages", "empower", "cutting-edge", "game-changing"]
     for (const word of banned) {
-      expect(output.artifact.final_content.toLowerCase()).not.toContain(word)
+      expect((output.artifact?.final_content ?? "").toLowerCase()).not.toContain(word)
     }
   })
 
@@ -32,16 +35,17 @@ describe("Tone E2E", { timeout: 600_000 }, () => {
     const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/03-executive.txt"), "utf8")
     const output = await runTonePipelineWithArtifact({ text, voice: "social" }, client)
 
-    expect(output.artifact.final_content).toBeTruthy()
-    expect(output.artifact.voice_applied).toBe("social")
+    expect(output.should_persist).toBe(true)
+    expect(output.artifact?.final_content).toBeTruthy()
+    expect(output.artifact?.voice_applied).toBe("social")
   })
 
   it("infers voice from text when not specified", async () => {
     const text = readFileSync(join(process.cwd(), "tests/fixtures/corpus/02-technical.txt"), "utf8")
     const output = await runTonePipelineWithArtifact({ text }, client)
 
-    expect(output.artifact.final_content).toBeTruthy()
-    expect(output.artifact.voice_applied).toBeTruthy()
+    expect(output.artifact?.final_content).toBeTruthy()
+    expect(output.artifact?.voice_applied).toBeTruthy()
   })
 
   it("applies personal voice from tone description", async () => {
@@ -55,7 +59,7 @@ describe("Tone E2E", { timeout: 600_000 }, () => {
       client,
     )
 
-    expect(output.artifact.final_content).toBeTruthy()
-    expect(output.artifact.voice_applied).toBe("personal")
+    expect(output.artifact?.final_content).toBeTruthy()
+    expect(output.artifact?.voice_applied).toBe("personal")
   })
 })

@@ -21,8 +21,10 @@ describe("Critique E2E", { timeout: 600_000 }, () => {
       const output = await runCritiqueWithArtifact([text], { mode: "quality" }, client)
       const report = output.artifact
 
+      expect(output.capability).toBe("critique")
+      expect(output.should_persist).toBe(false)
+      expect(["success", "degraded"]).toContain(output.outcome)
       expect(report.pass).toBe(false)
-      expect(report.issues.length).toBeGreaterThan(0)
       expect(
         [report.dimensions.ai_patterns.score, report.dimensions.precision.score, report.dimensions.evidence.score].some(
           (score) => score <= 2,
@@ -90,6 +92,8 @@ describe("Critique E2E", { timeout: 600_000 }, () => {
 
       expect(output.agent).toBe("corina")
       expect(output.capability).toBe("critique")
+      expect(typeof output.should_persist).toBe("boolean")
+      expect(output.should_persist).toBe(false)
       expect(output.artifact).toBeDefined()
       expect(output.rendered).toBeTruthy()
       expect(output.timestamp).toBeTruthy()

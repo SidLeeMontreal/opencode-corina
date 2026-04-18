@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { AI_PATTERN_MAP, detectAiPatterns, type Layer1Scan, type PatternMatch } from "opencode-text-tools";
 
 import { writeCapabilityAudit } from "./audit-log.js";
-import { createCapabilityOutput } from "./capability-output.js";
+import { createCapabilityOutput, createToolEnvelope, createToolEnvelopeFromCapabilityOutput } from "./capability-output.js";
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { formatInline, formatJson, formatReport } from "./detect-formatters.js";
 import { runLayer2Analysis } from "./detect-layer2.js";
@@ -19,7 +19,7 @@ import {
 } from "./detect-scoring.js";
 import { runPipelineWithArtifact } from "./pipeline.js";
 import { runTonePipelineWithArtifact } from "./tone-pipeline.js";
-import type { AgentCapabilityOutput, DetectionReport, OpenCodeClient, PatternFinding } from "./types.js";
+import type { CorinaToolEnvelope, DetectionReport, OpenCodeClient, PatternFinding } from "./types.js";
 import { validate } from "./validators.js";
 
 interface ResolvedInput {
@@ -271,7 +271,7 @@ export async function runDetectWithArtifact(
   input: DetectInput,
   client: OpenCodeClient,
   logger: AgentLogger = makeConsoleLogger("corina"),
-): Promise<AgentCapabilityOutput<DetectionReport>> {
+): Promise<CorinaToolEnvelope<DetectionReport>> {
   const startMs = Date.now();
   const usage = createUsageAccumulator();
   const resolved = resolveInput(input.text);
@@ -306,13 +306,21 @@ export async function runDetectWithArtifact(
       total_cost: 0,
       assumptions_count: report.assumptions.length,
     });
-    return createCapabilityOutput({
+    const capabilityOutput = createCapabilityOutput({
       capability: "detect",
       inputSummary: buildInputSummary(resolved, report),
       artifact: report,
       rendered: formatOutput("", report, input.format),
       assumptions: report.assumptions,
       metrics: { total_tokens: 0, total_cost: 0 },
+    });
+
+    return createToolEnvelopeFromCapabilityOutput({
+      capability: "detect",
+      output: capabilityOutput,
+      outcome: "degraded",
+      shouldPersist: false,
+      warnings: report.assumptions,
     });
   }
 
@@ -383,7 +391,7 @@ export async function runDetectWithArtifact(
       client,
       logger,
     );
-    rendered = `${rendered}\n\nAuto-fix\n--------\n${fixed.artifact.final_content}`;
+    rendered = `${rendered}\n\nAuto-fix\n--------\n${fixed.artifact?.final_content ?? fixed.rendered}`;
     chainedTo = "tone";
     chainResult = fixed.artifact;
     assumptions.push("Auto-fix rewrite appended using Corina tone capability.");
@@ -428,7 +436,7 @@ export async function runDetectWithArtifact(
       assumptions_count: assumptions.length,
     });
 
-    return {
+    const capabilityOutput = {
       ...createCapabilityOutput({
         capability: "detect",
         inputSummary: buildInputSummary(resolved, report),
@@ -440,6 +448,14 @@ export async function runDetectWithArtifact(
       }),
       ...(chainResult ? { chain_result: chainResult } : {}),
     };
+
+    return createToolEnvelopeFromCapabilityOutput({
+      capability: "detect",
+      output: capabilityOutput,
+      outcome,
+      shouldPersist: false,
+      warnings: outcome === "degraded" ? assumptions : [],
+    });
   } catch (error) {
     writeCapabilityAudit({
       capability: "detect",
@@ -455,7 +471,17 @@ export async function runDetectWithArtifact(
       degraded: false,
       ...errorDetails(error),
     });
-    throw error;
+    const rendered = `Corina detect failed: ${error instanceof Error ? error.message : String(error)}`;
+    return createToolEnvelope<DetectionReport>({
+      capability: "detect",
+      outcome: "failed",
+      shouldPersist: false,
+      artifact: null,
+      rendered,
+      warnings: [rendered],
+      inputSummary: buildCapabilityInputSummary(countWords(text), resolved.sourceType),
+      metrics: { total_tokens: usage.total_tokens, total_cost: usage.total_cost },
+    });
   }
 }
 
@@ -467,7 +493,7 @@ export async function runDetect(input: DetectInput, client: OpenCodeClient, logg
 export const runDetectPipeline = async (
   input: DetectInput,
   client: OpenCodeClient,
-): Promise<{ report: DetectionReport; output: string; fixedText?: string }> => {
+): Promise<{ report: DetectionReport | null; output: string; fixedText?: string }> => {
   const output = await runDetectWithArtifact(input, client);
   return { report: output.artifact, output: output.rendered };
 };
