@@ -13,7 +13,7 @@ Use this readiness classification:
 | Ticket | Readiness | Reason |
 | --- | --- | --- |
 | OCD-001 | Ready with validation gates | The policy decision is clear, but implementation must validate the exact OpenCode permission shape and must not use hosted `edit: ask` until approval behavior is proven non-hanging. |
-| OCD-002 | Ready, high priority, with root-policy caveat | The codebase already has a resolver, and the remaining work is concrete. Implementation must reconcile trusted config directories with hosted `external_directory` denial. |
+| OCD-002 | Ready, high priority | The codebase already has a resolver, and the remaining work is concrete. The trusted-config policy is now mode-specific: local plugin mode may use narrow user config roots, while hosted/headless mode defaults to workspace-only reads. |
 | OCD-003 | Ready after config/schema verification | The Chrome DevTools MCP decision is resolved: it has been removed from Corina's default hosted config. Remaining work is explicit permission policy and regression coverage. |
 | OCD-004 | Ready with smoke-target caveats | The provider-free discovery path is specified using documented OpenCode server endpoints. Implementation must handle experimental endpoint drift and keep live tool smoke opt-in because it depends on model/tool-routing behavior. |
 | OCD-005 | Ready as a specification | The skill layout and frontmatter contract are clear. The `opencode-smoke` skill must reference the `smoke:opencode` command contract defined by OCD-004 and should be implemented after that command exists in `package.json`. |
@@ -106,9 +106,22 @@ Do not implement provider-free discovery by reading `.opencode` files directly. 
 
 OCD-006 now explicitly covers inline text and path-like local file inputs only. Raw multimodal attachment payloads, OCR, screenshot inspection, image/PDF upload handling, and binary payload parsing are deferred to a future dedicated capability.
 
-## Remaining Gaps
+### 4. OCD-002 trusted config policy is resolved
 
-### 1. OpenCode schema/version verification is now confirmed for 1.15.3
+The hosted trusted-config-directory decision is now explicit:
+
+- Local OpenCode plugin mode may allow narrow user-owned config roots such as `~/.config/opencode/corina/rubrics` and `~/.config/opencode/corina/profiles`.
+- Those local plugin config paths must still pass realpath/root validation, symlink checks, file-type checks, and size limits.
+- Hosted/headless Docker mode defaults to workspace-only file reads because hosted `external_directory` is denied.
+- Hosted/headless mode must not read `~/.config/opencode/corina/...` from the container or host by default.
+- Hosted custom rubrics/profiles must be provided as inline text, stored inside the active workspace, or placed in a per-session mounted config root that is explicitly allowed by hosted OpenCode permission policy.
+- Any future hosted non-workspace config root must be narrow, per-session where possible, documented, permissioned, and covered by smoke/unit tests.
+
+This preserves local plugin ergonomics without weakening hosted isolation.
+
+## Implementation Caveats
+
+### 1. OpenCode schema/version verification is confirmed for 1.15.3
 
 The tickets rely on current OpenCode behavior for:
 
@@ -157,19 +170,7 @@ Future decision rule:
 - If a future OpenCode upgrade rejects or drops any permission shape, do not guess. Adjust the ticket to the supported schema for that version, or pin OpenCode to a version that supports the intended policy.
 - If endpoint responses stop exposing enough metadata to prove the policy, add a lower-level config parsing/lint test as supplemental coverage, but keep OpenCode server smoke as the authority for runtime compatibility.
 
-### 2. OCD-002 must reconcile trusted config directories with hosted `external_directory: deny`
-
-OCD-002 permits documented trusted config directories such as `~/.config/opencode/corina/rubrics` and `~/.config/opencode/corina/profiles`. OCD-001 and OCD-003 correctly prefer `external_directory: deny` in hosted mode.
-
-Implementation must make this mode-specific:
-
-- local plugin mode may allow narrow user config directories after resolver validation
-- hosted/headless mode should default to workspace-only reads unless a per-session trusted config directory is explicitly mounted and permissioned
-- any trusted directory outside the workspace must be narrow, documented, and tested against OpenCode `external_directory` behavior
-
-Without this reconciliation, implementation could either break legitimate local config files or weaken hosted file isolation.
-
-### 3. OCD-002 should force a single execution-root contract
+### 2. OCD-002 should force a single execution-root contract
 
 The ticket says to use the OpenCode tool context directory where available. That is correct, but implementation should make this non-optional at wrapper boundaries.
 
@@ -182,7 +183,7 @@ Recommended implementation contract:
 
 This protects Docker/OpenWork session workdirs and local plugin workspaces at the same time.
 
-### 4. OCD-004 uses an experimental tool endpoint
+### 3. OCD-004 uses an experimental tool endpoint
 
 OCD-004 uses `GET /experimental/tool/ids`, which is documented but explicitly experimental. Implementation should:
 
@@ -191,7 +192,7 @@ OCD-004 uses `GET /experimental/tool/ids`, which is documented but explicitly ex
 - fail with a clear compatibility message when the endpoint is unavailable, rather than silently falling back to direct file inspection
 - keep the OpenCode version used during validation in the smoke-test output
 
-### 5. Live tool smoke can be flaky unless it is explicitly opt-in and bounded
+### 4. Live tool smoke can be flaky unless it is explicitly opt-in and bounded
 
 OCD-004 live smoke relies on a model choosing the expected registered tool through `POST /session/:id/message`. That is useful end-to-end validation, but it can be affected by provider availability, model behavior, latency, and prompt routing.
 
@@ -204,7 +205,7 @@ Implementation should:
 - distinguish "provider unavailable", "model did not route", and "tool envelope failed" in failure messages
 - avoid making live smoke mandatory in PR CI unless provider credentials and stability are guaranteed
 
-### 6. Docker/OpenWork smoke target must be specified at implementation time
+### 5. Docker/OpenWork smoke target must be specified at implementation time
 
 OCD-004 asks for Docker/OpenWork smoke coverage, but the target can differ by deployment layer:
 
@@ -218,20 +219,16 @@ Implementation must specify which layer each smoke case targets. Recommended spl
 - OpenCode discovery smoke against a direct `opencode serve` process in local tests
 - optional Docker internal smoke only when the test harness can discover or request the active session server safely
 
-### 7. Implementation order is inconsistent between documents
+### 6. Implementation order is now aligned
 
-The ticket document's "Suggested Implementation Order" lists OCD-003 before OCD-004, while this readiness document recommends OCD-004 provider-free discovery smoke before finishing OCD-003.
-
-Recommended resolution:
+The ticket document now matches this readiness recommendation:
 
 - Keep OCD-001 and OCD-002 first.
 - Implement the provider-free part of OCD-004 before completing OCD-003 so hosted permission/config changes have a regression harness.
 - Complete OCD-003 after that harness exists.
 - Then implement OCD-006 and OCD-005.
 
-The ticket document should be updated to match this order or explicitly explain why it differs.
-
-### 8. OCD-001 still needs Docker/headless behavior tested before allowing hosted `ask`
+### 7. OCD-001 still needs Docker/headless behavior tested before allowing hosted `ask`
 
 The ticket says hosted Docker should use `edit: deny` unless approval is verified. That is the right default.
 
@@ -253,8 +250,10 @@ Tests must be updated. The minimum test set for implementation readiness is:
   - outside-workspace absolute path
   - traversal path
   - symlink escape
-  - trusted rubric/profile path
-  - trusted rubric/profile path when hosted `external_directory` is denied
+  - local plugin trusted rubric/profile path under `~/.config/opencode/corina/...`
+  - hosted trusted rubric/profile path under `~/.config/opencode/corina/...` rejected by default when `external_directory` is denied
+  - hosted workspace rubric/profile path allowed
+  - hosted per-session mounted config root allowed only when explicitly configured
   - Docker/OpenWork-style session root
   - local plugin workspace root
 
@@ -298,9 +297,7 @@ OCD-006 is now scoped tightly enough for implementation: reject unsafe visual/bi
 
 Before implementation starts, resolve these gates:
 
-1. Decide the hosted trusted-config-directory policy for OCD-002: workspace-only by default, or narrow per-session mounted config directories with matching OpenCode permission behavior.
-2. Align the implementation order between the ticket document and this readiness document, or explicitly document that OCD-004 provider-free smoke is a prerequisite for completing OCD-003.
-3. Specify Docker/OpenWork smoke targets: external nginx/OpenWork surface, gateway/internal OpenCode surface, direct `opencode serve`, or a staged combination.
+1. Specify Docker/OpenWork smoke targets: external nginx/OpenWork surface, gateway/internal OpenCode surface, direct `opencode serve`, or a staged combination.
 
 During implementation, enforce these gates:
 
@@ -308,6 +305,7 @@ During implementation, enforce these gates:
 2. Keep live tool smoke opt-in, timed, and separate from provider-free discovery smoke.
 3. Keep raw multimodal attachment ingestion out of OCD-006.
 4. Do not enable hosted `edit: ask` unless approval behavior is proven non-hanging.
+5. Do not allow hosted non-workspace trusted config roots unless they are explicitly mounted, permissioned, documented, and tested.
 
 After those gates, the tickets are ready to implement in the proposed order:
 

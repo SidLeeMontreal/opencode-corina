@@ -9,7 +9,7 @@ Scope: OpenCode-native safety, discoverability, and runtime smoke coverage
 Close the OpenCode-native operational gaps found during the May 17 audit:
 
 - make Corina's permissions match a controlled editor/orchestrator model where generated content is not persisted without explicit user intent and runtime approval
-- constrain all file-like inputs to the active workspace
+- constrain all file-like inputs to the active workspace, except for narrow local-plugin trusted config roots that are explicitly resolved and tested
 - expose only the hosted tools and agents required for Corina's public contract, with an explicit allowlist and permission policy
 - add true OpenCode smoke tests against registered agents and tools
 - add project-local skills for repeatable operational workflows
@@ -23,10 +23,10 @@ Use these definitions across all tickets in this document.
 
 - **Active workspace**: the directory OpenCode uses as the current working directory for the active session. In local mode this should be the repo root when OpenCode is started from the repo root. In hosted/session mode this should be the session work directory supplied by the OpenCode/OpenWork wrapper. Implementation must document the final source of truth instead of assuming `process.cwd()`.
 - **Workspace root**: the realpath-normalized root used for caller-controlled reads and writes. It must be stable for the duration of a tool call and must be passed explicitly where OpenCode exposes a tool context directory.
-- **Trusted config directory**: a narrow, documented, non-workspace directory used only for user-owned Corina configuration, such as `~/.config/opencode/corina/rubrics` or `~/.config/opencode/corina/profiles`.
+- **Trusted config directory**: a narrow, documented, non-workspace directory used only for user-owned Corina configuration, such as `~/.config/opencode/corina/rubrics` or `~/.config/opencode/corina/profiles`. These directories are allowed by default only in local OpenCode plugin mode. Hosted/headless mode defaults to workspace-only reads unless a trusted config directory is explicitly mounted per session and allowed by the hosted OpenCode permission policy.
 - **Caller-controlled file-like input**: any user/tool argument that can name a local file or directory, including relative paths, absolute paths, JSON fields containing paths, rubric paths, tone/profile paths, Markdown references that are resolved as local paths, and local attachment paths. URLs are not file-like inputs for this ticket set; they require separate `webfetch`/network policy.
-- **External path**: any realpath outside the active workspace and outside a documented trusted config directory.
-- **Allowed path**: a realpath inside the active workspace or inside a documented trusted config directory for the specific input type.
+- **External path**: any realpath outside the active workspace and outside a documented trusted config directory that is valid for the current runtime mode and specific input type.
+- **Allowed path**: a realpath inside the active workspace, or in local plugin mode only, inside a documented trusted config directory for the specific input type. In hosted/headless mode, non-workspace config paths are rejected unless the session explicitly provides a mounted trusted config root and the hosted OpenCode permission policy allows that root.
 - **Rejected path**: a missing, unreadable, directory, oversized, binary/unsupported, traversal, symlink-escaped, or otherwise external path. Rejected paths must produce a warning/degraded result rather than being read.
 - **Hidden subagent**: an agent marked `mode: subagent` and `hidden: true`, unavailable as a front-facing/default agent, and invocable only through the primary agent's explicit `task` allowlist.
 - **Non-mutating subagent**: a subagent with no file-write or command-execution capability: `edit: deny`, `bash: deny`, and no broad web or external-directory permission.
@@ -143,7 +143,7 @@ Canonical manual cases:
 P1
 
 **Goal**
-Ensure every caller-controlled path is constrained to the active workspace or documented trusted config directories before any read occurs.
+Ensure every caller-controlled path is constrained to the active workspace, or to a runtime-mode-specific trusted config root, before any read occurs.
 
 **Files**
 - `src/file-input.ts`
@@ -184,13 +184,15 @@ This ticket is coupled to OCD-001. Restricting reads is not enough if hosted con
 | Absolute workspace file | `/workspace/drafts/input.md` | Read only if realpath is inside workspace root. |
 | Traversal path | `../secret.txt` | Reject unless realpath remains inside workspace root. |
 | Symlink escape | `drafts/link-to-secret` | Reject if realpath escapes allowed roots. |
-| Trusted config file | `~/.config/opencode/corina/rubrics/custom.md` | Allow only for the specific config input type. |
+| Trusted config file, local plugin | `~/.config/opencode/corina/rubrics/custom.md` | Allow only for the specific config input type after realpath/root validation. |
+| Trusted config file, hosted/headless | `~/.config/opencode/corina/rubrics/custom.md` | Reject by default because hosted `external_directory` is denied. Allow only if the path is inside the active workspace or inside an explicitly mounted and permissioned session config root. |
 | URL | `https://example.com/a.md` | Not handled as file-like input; subject to separate web policy. |
 | Binary/visual file | `diagram.png` | Reject with visual/unsupported-input warning per OCD-006. |
 
 **Changes**
 - Extend `resolveTextOrFileInput()` or add a companion helper for non-content config files.
 - Pass an explicit allowed root from the OpenCode tool context where available. Current tool wrappers must not rely only on source-level runner defaults; they should propagate the active execution directory into file-input resolution.
+- Pass a runtime mode or equivalent policy object into file resolution so local plugin and hosted/headless roots cannot be conflated.
 - Define and document the implementation source of truth for active workspace:
   - OpenCode tool context directory when present
   - hosted/session directory when passed by the wrapper
@@ -198,10 +200,15 @@ This ticket is coupled to OCD-001. Restricting reads is not enough if hosted con
 - Cover both runtime shapes:
   - local plugin mode, where the active workspace is normally the repo/workspace root
   - Docker/OpenWork mode, where the active workspace may be a runtime workspace or per-session work directory
+- Use this trusted-config policy:
+  - local plugin mode may allow narrow Corina-owned user config directories after resolver validation
+  - hosted/headless mode defaults to workspace-only reads because hosted `external_directory` is denied
+  - hosted custom rubrics/profiles must be passed as inline text, stored inside the active workspace, or placed in a per-session mounted config root that is explicitly allowed by hosted OpenCode policy
+  - hosted mode must not silently read `~/.config/opencode/corina/...` from the container or host
 - Constrain:
-  - `toneFile` to active workspace or a documented user config directory
-  - brand `profile` to active workspace or `~/.config/opencode/corina/profiles`
-  - explicit rubric paths to active workspace or `~/.config/opencode/corina/rubrics`
+  - `toneFile` to active workspace, or to a documented user config directory in local plugin mode
+  - brand `profile` to active workspace, or to `~/.config/opencode/corina/profiles` in local plugin mode
+  - explicit rubric paths to active workspace, or to `~/.config/opencode/corina/rubrics` in local plugin mode
 - Reject symlinks that escape allowed roots.
 - Preserve bundled lookup behavior for `prompts/rubrics/corina.md`.
 - Return degraded warnings instead of reading unsafe paths.
@@ -213,7 +220,9 @@ This ticket is coupled to OCD-001. Restricting reads is not enough if hosted con
 - Absolute paths outside allowed roots are rejected.
 - Relative traversal outside allowed roots is rejected.
 - Symlink escapes are rejected.
-- Bundled rubrics and user-config rubrics still work.
+- Bundled rubrics and local-plugin user-config rubrics still work.
+- Hosted/headless mode rejects external `~/.config/opencode/corina/...` paths by default.
+- Hosted/headless custom rubrics/profiles work only when provided as inline text, stored inside the active workspace, or placed in an explicitly mounted and permissioned session config root.
 - Existing inline-text behavior is unchanged.
 - Tests cover every tool entry point listed in this ticket.
 - Tests prove the resolver uses the active OpenCode execution directory rather than an accidental repository or process root.
@@ -230,6 +239,10 @@ Add unit cases for:
 - brand profile path outside workspace
 - explicit rubric path outside workspace
 - allowed bundled rubric
+- local plugin user rubric/profile inside `~/.config/opencode/corina/...`
+- hosted external user rubric/profile under `~/.config/opencode/corina/...` rejected by default
+- hosted workspace rubric/profile allowed
+- hosted per-session mounted config root allowed only when explicitly configured
 - symlink escape
 - local plugin workspace root
 - Docker/OpenWork-style session work directory
@@ -578,12 +591,12 @@ Add unit cases for:
 
 1. OCD-001 - harden Corina permissions.
 2. OCD-002 - route every file-like input through safe roots.
-3. OCD-003 - add hosted permission policy for MCP and external tools.
-4. OCD-004 - add OpenCode-native smoke tests.
+3. OCD-004 - add OpenCode-native provider-free smoke tests.
+4. OCD-003 - add hosted permission policy for MCP and external tools.
 5. OCD-006 - define visual attachment policy.
 6. OCD-005 - add project-local skills.
 
-OCD-001 and OCD-002 should be treated as safety fixes before any broader hosted exposure. OCD-004 is the strongest regression guard for future OpenCode compatibility.
+OCD-001 and OCD-002 should be treated as safety fixes before any broader hosted exposure. The provider-free part of OCD-004 should land before completing OCD-003 so hosted permission/config changes have a runtime regression harness.
 
 Permission policy and path safety are intentionally coupled. Do not close OCD-001 without confirming writes are workspace-safe, and do not close OCD-002 while hosted config can grant broad external-directory access.
 
