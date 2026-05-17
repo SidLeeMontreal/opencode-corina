@@ -16,7 +16,7 @@ Use this readiness classification:
 | OCD-002 | Ready, high priority | The codebase already has a resolver, and the remaining work is concrete: route every caller-controlled path through it and pass the active execution root explicitly. |
 | OCD-003 | Ready after config/schema verification | The Chrome DevTools MCP decision is resolved: it has been removed from Corina's default hosted config. Remaining work is explicit permission policy and regression coverage. |
 | OCD-004 | Ready after config/schema verification | The provider-free discovery path is now specified using documented OpenCode server endpoints. Live tool smoke remains opt-in because it requires provider credentials. |
-| OCD-005 | Ready after OCD-004 exists | The skill layout and frontmatter contract are now clear, but `opencode-smoke` depends on a real `smoke:opencode` command that does not exist yet. |
+| OCD-005 | Ready as a specification | The skill layout and frontmatter contract are clear. The `opencode-smoke` skill must reference the `smoke:opencode` command contract defined by OCD-004 and should be implemented after that command exists in `package.json`. |
 | OCD-006 | Ready with scope clarification | The binary/text policy is clear for local file paths. It should explicitly say current implementation covers path-like inputs, not true multimodal attachment payloads. |
 
 Overall recommendation: implement OCD-001 and OCD-002 first, then OCD-004 provider-free discovery smoke, then finish OCD-003, OCD-006, and OCD-005.
@@ -30,8 +30,8 @@ Current code confirms the tickets describe real gaps:
 - `src/file-input.ts` already performs root, realpath, size, directory, and symlink-escape checks, so OCD-002 should extend existing code instead of introducing a second resolver.
 - `.opencode/tools/tone.ts` creates an OpenCode client with `context.directory`, but the downstream source runner still calls `resolveTextOrFileInput()` without receiving that directory. OCD-002 correctly needs execution-root propagation, not just resolver hardening.
 - `src/tone-pipeline.ts`, `src/critique-rubric.ts`, and `src/critique-normalizer.ts` still contain direct path lookup/read behavior for tone/profile/rubric paths.
-- `package.json` has no `smoke:opencode` script today, so OCD-004 and OCD-005 must add test harness and skill content in that order. OCD-004 should use OpenCode server endpoints for provider-free discovery and keep model-invoking checks opt-in.
-- There is no `.opencode/skills` directory today, so OCD-005 is additive and low-risk once the smoke command exists.
+- `package.json` has no `smoke:opencode` script today, so OCD-004 must add the test harness before `opencode-smoke` can be implemented. OCD-004 should use OpenCode server endpoints for provider-free discovery and keep model-invoking checks opt-in.
+- There is no `.opencode/skills` directory today, so OCD-005 is additive and low-risk. Its specification is ready now, but implementation should follow the `smoke:opencode` command added by OCD-004.
 
 ## External OpenCode Contract Check
 

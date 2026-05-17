@@ -400,6 +400,9 @@ P3
 **Goal**
 Make recurring Corina maintenance workflows discoverable to OpenCode agents through project-local skills.
 
+**Depends on**
+- OCD-004 smoke command contract. OCD-005 is ready as a specification now that OCD-004 defines `npm run smoke:opencode`, but implementation of the `opencode-smoke` skill should happen after the command exists in `package.json`.
+
 **Files**
 - new `.opencode/skills/opencode-smoke/SKILL.md`
 - new `.opencode/skills/prompt-contract-audit/SKILL.md`
@@ -435,6 +438,11 @@ The repo has agents, tools, and a plugin, but no `.opencode/skills/<name>/SKILL.
   ```bash
   OPENCODE_SMOKE=1 npm run smoke:opencode
   ```
+- The `opencode-smoke` skill must describe the OCD-004 smoke workflow:
+  - default provider-free discovery/config smoke
+  - no model/provider credentials required for discovery smoke
+  - opt-in live tool smoke with `OPENCODE_LIVE_TOOL_SMOKE=1`
+  - OpenCode server endpoint checks for `/global/health`, `/config`, `/agent`, `/experimental/tool/ids`, and `/mcp`
 - The `prompt-contract-audit` skill must include:
   ```bash
   npm run test:unit -- tests/unit/prompt-contract.test.ts
@@ -451,6 +459,7 @@ The repo has agents, tools, and a plugin, but no `.opencode/skills/<name>/SKILL.
 
 **Acceptance Criteria**
 - OpenCode can discover the project-local skills from `.opencode/skills`.
+- `opencode-smoke` references the existing `smoke:opencode` command contract from OCD-004 rather than inventing a second smoke workflow.
 - Skill names are valid and stable.
 - Skills do not grant new capabilities by themselves.
 - Hosted config explicitly allows or denies the project skills.
