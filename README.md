@@ -90,6 +90,8 @@ Clone this repo and run OpenCode from the repo root. OpenCode will automatically
 
 Dependencies for local use are declared in `.opencode/package.json` and installed by OpenCode via Bun at startup. Run `npm install` in this repo first: the `preinstall` script clones `opencode-model-resolver`, `opencode-text-tools`, and `opencode-eval-harness` into `deps/`, builds them, and wires them via `file:deps/…`. Git is required. Set `SKIP_OPENCODE_DEPS=1` to skip that step if you manage `deps/` yourself.
 
+Helper dependency revisions are pinned in `deps.lock.json`. To update one, change the commit SHA in that file, remove the corresponding `deps/<name>` checkout, and run `npm install`.
+
 ## Hosted deployment mode
 
 The hosted wrapper lives entirely under `deploy/openwork-server/`.
@@ -359,6 +361,8 @@ Example:
 - `.corina-local/prompts/voices/journalist.md` overrides `prompts/voices/journalist.md`
 
 TypeScript prompt loaders check `.corina-local/prompts/` first, then fall back to the bundled prompt under `prompts/`.
+
+Custom critique rubrics live in `~/.config/opencode/corina/rubrics/`. User rubrics are checked before bundled rubrics. If a requested rubric is missing or invalid, Corina falls back to the bundled `prompts/rubrics/corina.md` standard.
 
 ### Installing project agents
 Run:

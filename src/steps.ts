@@ -165,6 +165,10 @@ export function extractFinalText(responseText: string): string {
   return (segments.at(-1) ?? responseText).trim();
 }
 
+function prependContextBlock(contextBlock: string | undefined, prompt: string): string {
+  return [contextBlock?.trim() || null, prompt.trim()].filter(Boolean).join("\n\n");
+}
+
 async function runSession<T>(input: {
   client: OpenCodeClient;
   title: string;
@@ -272,6 +276,7 @@ export async function runBriefIntake(
   model?: ResolvedModel,
   logger?: AgentLogger,
   usage?: UsageAccumulator,
+  contextBlock?: string,
 ): Promise<StepResult<BriefArtifact>> {
   const artifact = await runSession<BriefArtifact>({
     client,
@@ -283,7 +288,7 @@ export async function runBriefIntake(
     model,
     logger,
     usage,
-    taskPrompt: [
+    taskPrompt: prependContextBlock(contextBlock, [
       "Turn the raw writing request into a validated BriefArtifact.",
       "Return JSON only via the schema formatter for this step.",
       "If the brief is underspecified, fill missing_info with concrete clarification questions.",
@@ -291,7 +296,7 @@ export async function runBriefIntake(
       "",
       "RAW BRIEF:",
       rawBrief.trim(),
-    ].join("\n"),
+    ].join("\n")),
   });
 
   return { artifact };
@@ -303,6 +308,7 @@ export async function runOutline(
   model?: ResolvedModel,
   logger?: AgentLogger,
   usage?: UsageAccumulator,
+  contextBlock?: string,
 ): Promise<StepResult<OutlineArtifact>> {
   const artifact = await runSession<OutlineArtifact>({
     client,
@@ -314,14 +320,14 @@ export async function runOutline(
     model,
     logger,
     usage,
-    taskPrompt: [
+    taskPrompt: prependContextBlock(contextBlock, [
       "Create an OutlineArtifact for the writing assignment below.",
       "Return JSON only via the schema formatter for this step.",
       "Build a thesis, useful structure, explicit risks, and a strong editorial intent.",
       "",
       "BRIEF ARTIFACT:",
       JSON.stringify(brief, null, 2),
-    ].join("\n"),
+    ].join("\n")),
   });
 
   return { artifact };
@@ -334,6 +340,7 @@ export async function runDraft(
   model?: ResolvedModel,
   logger?: AgentLogger,
   usage?: UsageAccumulator,
+  contextBlock?: string,
 ): Promise<StepResult<DraftArtifact>> {
   const content = await runSession<string>({
     client,
@@ -344,7 +351,7 @@ export async function runDraft(
     model,
     logger,
     usage,
-    taskPrompt: [
+    taskPrompt: prependContextBlock(contextBlock, [
       "Write the full draft using the brief and outline below.",
       "Follow the Corina persona process, but the content we will keep is the ## FINAL section.",
       "Ground claims in the supplied material only. Do not invent statistics.",
@@ -355,7 +362,7 @@ export async function runDraft(
       "",
       "OUTLINE ARTIFACT:",
       JSON.stringify(outline, null, 2),
-    ].join("\n"),
+    ].join("\n")),
   });
 
   const bannedWords = sanitizeWords(content);
@@ -561,12 +568,13 @@ export async function runCritique(
   model?: ResolvedModel,
   logger?: AgentLogger,
   usage?: UsageAccumulator,
+  executionContextBlock?: string,
 ): Promise<StepResult<CritiqueArtifact>> {
   const context = buildEvaluationContextFromCritiqueArgs({ mode: "quality" }, draft.content, JSON.stringify(brief, null, 2));
   const selectedModules = selectModules(context, "critic");
   const evaluatorModules = selectedModules.filter((module) => module.id !== "critic-adjudicator");
   const module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>> = {};
-  const contextBlock = buildEvaluationContextBlock(context);
+  const contextBlock = [executionContextBlock?.trim() || null, buildEvaluationContextBlock(context)].filter(Boolean).join("\n\n");
 
   const moduleResults = await Promise.all(
     evaluatorModules.map(async (module) => {
@@ -674,6 +682,7 @@ export async function runRevise(
   model?: ResolvedModel,
   logger?: AgentLogger,
   usage?: UsageAccumulator,
+  contextBlock?: string,
 ): Promise<StepResult<DraftArtifact>> {
   const content = await runSession<string>({
     client,
@@ -684,7 +693,7 @@ export async function runRevise(
     model,
     logger,
     usage,
-    taskPrompt: [
+    taskPrompt: prependContextBlock(contextBlock, [
       "Revise the draft using the critique below.",
       "Follow the Corina persona process, but the content we will keep is the ## FINAL section.",
       "Fix every revision instruction and every fatal issue. Preserve the core argument unless the critique requires changing it.",
@@ -695,7 +704,7 @@ export async function runRevise(
       "",
       "CRITIQUE ARTIFACT:",
       JSON.stringify(critique, null, 2),
-    ].join("\n"),
+    ].join("\n")),
   });
 
   return {

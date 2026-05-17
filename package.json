@@ -39,6 +39,10 @@
     "vitest": "^4.1.4",
     "opencode-eval-harness": "file:deps/opencode-eval-harness"
   },
+  "overrides": {
+    "fast-uri": "^3.1.2",
+    "postcss": "^8.5.14"
+  },
   "keywords": [
     "opencode",
     "plugin",

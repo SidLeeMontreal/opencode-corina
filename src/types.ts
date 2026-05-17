@@ -6,6 +6,65 @@ export type { AgentCapabilityOutput } from "opencode-text-tools";
 export type { ModelInfo, Preset, ResolvedModel, StepModelConfig } from "opencode-model-resolver";
 
 export type ToolOutcome = "success" | "degraded" | "failed";
+export type PipelineExecutionCapability = "draft" | "rewrite" | "tone" | "detect" | "critique" | "concise";
+export type ExecutionContentScope = "full_document" | "fragment";
+export type ExecutionFindingSeverity = "low" | "medium" | "major" | "fatal";
+
+export interface ExecutionVoiceContext {
+  name: ToneVoice | string | null;
+  tone_description: string | null;
+  profile_ref?: string | null;
+  key_rules: string[];
+  banned_patterns: string[];
+}
+
+export interface ExecutionContentMetadata {
+  format: string | null;
+  audience: string | null;
+  word_count: number | null;
+  scope: ExecutionContentScope;
+  fragment_label?: string | null;
+  fragment_position?: string | null;
+  full_document_ref?: string | null;
+  full_document_summary?: string | null;
+}
+
+export interface ExecutionFinding {
+  step: string;
+  type: string;
+  severity: ExecutionFindingSeverity;
+  summary: string;
+  location?: string | null;
+  action?: string | null;
+}
+
+export interface PipelineExecutionContext {
+  run_id: string;
+  capability: PipelineExecutionCapability;
+  user_intent_summary: string;
+  requested_operation: string;
+  source_material_refs: string[];
+  user_constraints: string[];
+  global_instructions: string[];
+  voice: ExecutionVoiceContext;
+  content: ExecutionContentMetadata;
+  findings: ExecutionFinding[];
+  assumptions: string[];
+  step_history: string[];
+}
+
+export interface PipelineExecutionContextDelta {
+  user_intent_summary?: string;
+  requested_operation?: string;
+  source_material_refs?: string[];
+  user_constraints?: string[];
+  global_instructions?: string[];
+  voice?: Partial<ExecutionVoiceContext>;
+  content?: Partial<ExecutionContentMetadata>;
+  findings?: ExecutionFinding[];
+  assumptions?: string[];
+  step_history?: string[];
+}
 
 export interface CorinaToolEnvelope<TArtifact> {
   agent: "corina";
@@ -360,6 +419,7 @@ export interface DetectionRawInput {
 
 export interface WorkflowState {
   briefText: string;
+  context?: PipelineExecutionContext;
   briefArtifact?: BriefArtifact;
   outlineArtifact?: OutlineArtifact;
   draftArtifact?: DraftArtifact;

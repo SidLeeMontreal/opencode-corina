@@ -1,6 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { AI_PATTERN_MAP, detectAiPatterns, type Layer1Scan, type PatternMatch } from "opencode-text-tools";
 
 import { writeCapabilityAudit } from "./audit-log.js";
@@ -8,6 +5,7 @@ import { createCapabilityOutput, createToolEnvelope, createToolEnvelopeFromCapab
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { formatInline, formatJson, formatReport } from "./detect-formatters.js";
 import { runLayer2Analysis } from "./detect-layer2.js";
+import { resolveTextOrFileInput } from "./file-input.js";
 import {
   applyLayer2Adjustment,
   buildPatternCounts,
@@ -34,24 +32,7 @@ function cleanText(text: string): string {
 }
 
 function resolveInput(textOrPath: string): ResolvedInput {
-  const trimmed = textOrPath.trim();
-  const candidates = [trimmed, resolve(trimmed)];
-
-  for (const candidate of candidates) {
-    if (!candidate || !existsSync(candidate)) continue;
-    try {
-      return { text: readFileSync(candidate, "utf8"), sourcePath: candidate, sourceType: "file" };
-    } catch {
-      return {
-        text: "",
-        sourcePath: candidate,
-        sourceType: "file",
-        note: `Could not read file at ${candidate}.`,
-      };
-    }
-  }
-
-  return { text: trimmed, sourcePath: null, sourceType: "text" };
+  return resolveTextOrFileInput(textOrPath);
 }
 
 function countWords(text: string): number {

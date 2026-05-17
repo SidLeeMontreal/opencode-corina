@@ -13,9 +13,9 @@ const logger = makeConsoleLogger("tone-tool")
 
 export default tool({
   description:
-    "Rewrite content in a specified voice and format using Corina. Returns the shared structured envelope by default, with canonical rewritten text in artifact.final_content, presentation output in rendered, top-level outcome, and should_persist=true for usable rewrites. Supports 11 voices: journalist, technical, persuasive, social, ux, seo, accessibility, executive, brand, email, personal. All params optional — Corina infers missing ones.",
+    "Rewrite content in a specified voice and format using Corina. Returns the shared structured envelope by default, with canonical rewritten text in artifact.final_content, presentation output in rendered, top-level outcome, and should_persist=true for usable rewrites. Supports 11 voices: journalist, technical, persuasive, social, ux, seo, accessibility, executive, brand, email, personal. Text may be inline content or a file path inside the active workspace.",
   args: {
-    text: tool.schema.string().min(1),
+    text: tool.schema.string().min(1).describe("Text to rewrite or a readable file path inside the active workspace."),
     voice: tool.schema.string().optional(),
     format: tool.schema.string().optional(),
     audience: tool.schema.string().optional(),

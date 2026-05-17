@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { createCapabilityOutput, createToolEnvelope, createToolEnvelopeFromCapabilityOutput } from "./capability-output.js";
 import { writeCapabilityAudit } from "./audit-log.js";
+import { resolveTextOrFileInput } from "./file-input.js";
 import {
   addLlmMetrics,
   createUsageAccumulator,
@@ -133,26 +134,6 @@ async function deleteSession(client: OpenCodeClient, sessionId: string): Promise
 
 function cleanText(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\t/g, " ").replace(/[ \t]+\n/g, "\n").trim();
-}
-
-function maybeResolveTextInput(textOrPath: string): { text: string; sourcePath: string | null } {
-  const trimmed = textOrPath.trim();
-  const candidates = [trimmed, resolve(trimmed)];
-
-  for (const candidate of candidates) {
-    if (!candidate || !existsSync(candidate)) {
-      continue;
-    }
-
-    try {
-      const fileText = readFileSync(candidate, "utf8");
-      return { text: fileText, sourcePath: candidate };
-    } catch {
-      return { text: trimmed, sourcePath: null };
-    }
-  }
-
-  return { text: trimmed, sourcePath: null };
 }
 
 function countWords(text: string): number {
@@ -533,7 +514,10 @@ export async function runTonePipelineWithArtifact(
   const startMs = Date.now();
   const usage = createUsageAccumulator();
   const assumptions: string[] = [];
-  const { text: sourceText, sourcePath } = maybeResolveTextInput(input.text);
+  const { text: sourceText, sourcePath, note: sourceNote } = resolveTextOrFileInput(input.text);
+  if (sourceNote) {
+    assumptions.push(sourceNote);
+  }
   const originalText = cleanText(sourceText);
 
   logger.info("capability_start", {
@@ -552,8 +536,8 @@ export async function runTonePipelineWithArtifact(
       changes_summary: ["Returned a safe single-line fallback for empty input."],
       humanizer_score: { score: 100, remaining_flags: [] },
       preservation_check: { meaning_preserved: true, flagged_drift: [] },
-      validator_notes: ["Input was empty."],
-      assumptions: ["Source text was empty."],
+      validator_notes: sourceNote ? ["Input was empty.", sourceNote] : ["Input was empty."],
+      assumptions: [...assumptions, "Source text was empty."],
       validation_score: 100,
     };
 

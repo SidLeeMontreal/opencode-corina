@@ -74,8 +74,11 @@ jobs:
         if: steps.probe.outcome == 'success'
         run: |
           TOKEN="${CI_REPO_READ_TOKEN:-$GITHUB_TOKEN_FALLBACK}"
+          PIN="$(node -p "JSON.parse(require('fs').readFileSync('deps.lock.json', 'utf8')).repositories['opencode-eval-harness'].commit")"
           rm -rf deps/opencode-eval-harness
-          git -c http.extraheader="AUTHORIZATION: bearer ${TOKEN}" clone --depth 1 --branch main https://github.com/SidLeeMontreal/opencode-eval-harness.git deps/opencode-eval-harness
+          git -c http.extraheader="AUTHORIZATION: bearer ${TOKEN}" clone https://github.com/SidLeeMontreal/opencode-eval-harness.git deps/opencode-eval-harness
+          git -C deps/opencode-eval-harness checkout --detach "${PIN}"
+          test "$(git -C deps/opencode-eval-harness rev-parse HEAD)" = "${PIN}"
           npm install --prefix deps/opencode-eval-harness
           npm run build --prefix deps/opencode-eval-harness
 

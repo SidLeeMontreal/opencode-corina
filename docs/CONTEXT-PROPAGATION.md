@@ -10,6 +10,8 @@ This recommendation fits Corina’s architecture because OpenCode sessions are c
 
 The design goal is reliability first: the final gate agent should always know the original user intent, active voice parameters, non-negotiable constraints, document shape, and relevant upstream findings. Token efficiency comes from treating full artifacts as external state and injecting only the high-signal summary that the next step actually needs.
 
+Implementation tickets for this design live in `docs/context-propagation-implementation-tickets.md`.
+
 ---
 
 ## 2. Research Summary
@@ -247,7 +249,7 @@ This combines the best parts of three patterns:
 
 ```ts
 export type PipelineMode =
-  | "write"
+  | "draft"
   | "rewrite"
   | "tone"
   | "detect"
@@ -623,7 +625,7 @@ interface StepContextDelta {
 
 ### 5.3 Phase 3 — Retrofit existing capabilities
 
-#### `write`
+#### `draft`
 - initialize user intent, audience, format, and source refs
 - record outline decisions only if downstream relevant
 - propagate critique and audit findings explicitly
