@@ -15,11 +15,11 @@ Use this readiness classification:
 | OCD-001 | Ready with one schema/config verification step | The policy decision is now clear, but implementation must validate the exact OpenCode permission shape used in hosted config before merging. |
 | OCD-002 | Ready, high priority | The codebase already has a resolver, and the remaining work is concrete: route every caller-controlled path through it and pass the active execution root explicitly. |
 | OCD-003 | Ready after config/schema verification | The Chrome DevTools MCP decision is resolved: it has been removed from Corina's default hosted config. Remaining work is explicit permission policy and regression coverage. |
-| OCD-004 | Partially ready; needs a discovery spike | The goal is correct, but the exact OpenCode API surface for discovering registered agents/tools is not specified. Discovery/config smoke should be implemented first, then live tool smoke. |
+| OCD-004 | Ready after config/schema verification | The provider-free discovery path is now specified using documented OpenCode server endpoints. Live tool smoke remains opt-in because it requires provider credentials. |
 | OCD-005 | Ready after OCD-004 exists | The skill layout and frontmatter contract are now clear, but `opencode-smoke` depends on a real `smoke:opencode` command that does not exist yet. |
 | OCD-006 | Ready with scope clarification | The binary/text policy is clear for local file paths. It should explicitly say current implementation covers path-like inputs, not true multimodal attachment payloads. |
 
-Overall recommendation: implement OCD-001 and OCD-002 first, run a short OCD-004 discovery spike in parallel, then finish OCD-003, OCD-006, and OCD-005.
+Overall recommendation: implement OCD-001 and OCD-002 first, then OCD-004 provider-free discovery smoke, then finish OCD-003, OCD-006, and OCD-005.
 
 ## Grounding Against Current Codebase
 
@@ -30,7 +30,7 @@ Current code confirms the tickets describe real gaps:
 - `src/file-input.ts` already performs root, realpath, size, directory, and symlink-escape checks, so OCD-002 should extend existing code instead of introducing a second resolver.
 - `.opencode/tools/tone.ts` creates an OpenCode client with `context.directory`, but the downstream source runner still calls `resolveTextOrFileInput()` without receiving that directory. OCD-002 correctly needs execution-root propagation, not just resolver hardening.
 - `src/tone-pipeline.ts`, `src/critique-rubric.ts`, and `src/critique-normalizer.ts` still contain direct path lookup/read behavior for tone/profile/rubric paths.
-- `package.json` has no `smoke:opencode` script today, so OCD-004 and OCD-005 must add test harness and skill content in that order.
+- `package.json` has no `smoke:opencode` script today, so OCD-004 and OCD-005 must add test harness and skill content in that order. OCD-004 should use OpenCode server endpoints for provider-free discovery and keep model-invoking checks opt-in.
 - There is no `.opencode/skills` directory today, so OCD-005 is additive and low-risk once the smoke command exists.
 
 ## External OpenCode Contract Check
@@ -48,6 +48,7 @@ Implementation should still validate the repository's actual installed OpenCode 
 References:
 
 - OpenCode config discovery and permissions: https://open-code.ai/en/docs/config
+- OpenCode server endpoints for `/global/health`, `/config`, `/agent`, `/experimental/tool/ids`, `/mcp`, `/session`, and `/session/:id/message`: https://opencode.ai/docs/server/
 - OpenCode tool permissions and `edit`/`write` relationship: https://opencode.ai/docs/tools/
 - OpenCode agent permission keys and pattern behavior: https://opencode.ai/docs/agents/
 - OpenCode skill layout, frontmatter, naming, and `permission.skill`: https://opencode.ai/docs/skills
@@ -65,18 +66,30 @@ OCD-003 is now implementation-ready with this policy:
 - future hosted MCP tools must be version-pinned
 - future hosted MCP tools must have permission rules and smoke coverage
 
-### 2. OCD-004 needs a small API-discovery spike
+### 2. OCD-004 discovery path is resolved
 
-The ticket asks smoke tests to verify registered agents/tools through OpenCode. That is the right target, but the exact API calls are not named.
+The ticket asks smoke tests to verify registered agents/tools through OpenCode. The documentation now names the provider-free server endpoints to use.
 
-Before implementing full smoke tests, add a small discovery task:
+Provider-free discovery smoke should:
 
 - start `opencode serve` from the repo root
-- identify the stable endpoints or SDK calls for agent/tool discovery
-- document which checks are provider-free
-- only then add live tool invocation tests
+- call `GET /global/health`
+- call `GET /config`
+- call `GET /agent`
+- call `GET /experimental/tool/ids`
+- call `GET /mcp`
+- optionally call `GET /doc` as a fallback schema/contract diagnostic
+- assert Corina, subagents, hosted config, and tool IDs from those responses
 
-Without this spike, implementers may fall back to reading files directly, which would recreate the same weakness the ticket is trying to remove.
+Live tool smoke should be separate and opt-in:
+
+- create a session with `POST /session`
+- send prompts through `POST /session/:id/message`
+- set `agent: "corina"`
+- require provider credentials
+- verify shared envelope behavior for `draft`, `tone`, `detect`, `critique`, and `concise`
+
+Do not implement provider-free discovery by reading `.opencode` files directly. File reads can be supplemental diagnostics after server endpoint checks fail, but they are not the smoke-test authority.
 
 ### 3. OCD-002 is ready, but should force a single execution-root contract
 
@@ -139,7 +152,7 @@ Tests must be updated. The minimum test set for implementation readiness is:
   - accept UTF-8 source/config text such as `.ts`, `.html`, `.yaml`, and extensionless text
 
 - OpenCode smoke tests:
-  - provider-free discovery/config smoke
+  - provider-free discovery/config smoke using `/global/health`, `/config`, `/agent`, `/experimental/tool/ids`, and `/mcp`
   - opt-in live tool smoke
   - Docker/OpenWork health and no-hang smoke where feasible
 
@@ -165,14 +178,13 @@ The visual policy is a moderate compatibility risk only if implemented as a stri
 Before starting implementation, resolve these gates:
 
 1. Confirm the installed OpenCode version accepts the planned `permission` shapes for hosted config and agent frontmatter.
-2. Identify the OpenCode API or SDK route for provider-free agent/tool discovery smoke tests.
-3. Clarify in OCD-006 that the initial implementation covers path-like local file inputs, not raw multimodal attachment payloads.
+2. Clarify in OCD-006 that the initial implementation covers path-like local file inputs, not raw multimodal attachment payloads.
 
 After those gates, the tickets are ready to implement in the proposed order:
 
 1. OCD-001
 2. OCD-002
-3. OCD-004 discovery smoke spike
+3. OCD-004 provider-free discovery smoke
 4. OCD-003
 5. OCD-006
 6. OCD-005

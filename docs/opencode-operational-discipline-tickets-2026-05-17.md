@@ -330,17 +330,26 @@ Current integration tests call source-level functions such as `runDraftWithArtif
 **Changes**
 - Add a smoke command, for example `npm run smoke:opencode`.
 - Split smoke coverage into two levels:
-  - discovery/config smoke, which does not require a live LLM provider and verifies OpenCode can see the registered agents, tools, plugin, default agent, permissions, and skills
-  - live tool smoke, enabled only when provider credentials are available, which invokes the registered tool surface and checks envelope behavior
+  - discovery/config smoke, which does not require a live LLM provider and verifies OpenCode can see the registered agents, tools, plugin, default agent, permissions, MCP status, and skills where OpenCode exposes them
+  - live tool smoke, enabled only when provider credentials are available, which uses the OpenCode session/message API to prompt Corina through the registered agent/tool surface and checks envelope behavior
 - Start `opencode serve` from the repo root on a test port.
-- Verify `/global/health`.
-- Exercise the registered tool surface through OpenCode, not direct imports.
+- Use documented OpenCode server endpoints for provider-free discovery:
+  - `GET /global/health` to verify the server is healthy
+  - `GET /config` to verify project config loaded, including `default_agent: corina` and permission posture
+  - `GET /agent` to verify Corina and subagents are registered with expected mode/hidden/permission metadata
+  - `GET /experimental/tool/ids` to verify registered tool IDs include `draft`, `tone`, `detect`, `critique`, and `concise`
+  - `GET /mcp` to verify hosted config does not register unexpected MCP servers
+  - `GET /doc` as a fallback contract check when endpoint response shapes change
+- Do not implement discovery smoke by reading `.opencode` files directly. File reads can be used only as supplemental diagnostics after the OpenCode server checks fail.
+- Exercise the registered tool surface through OpenCode server APIs, not direct TypeScript imports.
 - Minimum smoke cases:
-  - `draft` returns the shared envelope
-  - `tone` returns `should_persist=true` on usable rewrite
-  - `detect` returns `should_persist=false`
-  - `critique` returns advisory envelope
-  - `concise` returns rewrite envelope
+  - provider-free discovery confirms `draft`, `tone`, `detect`, `critique`, and `concise` are registered tool IDs
+  - live smoke, when enabled, creates a session with `POST /session`, sends a prompt through `POST /session/:id/message` with `agent: "corina"`, and verifies the returned content has Corina's shared envelope shape
+  - live `draft` prompt returns the shared envelope
+  - live `tone` prompt returns `should_persist=true` on usable rewrite
+  - live `detect` prompt returns `should_persist=false`
+  - live `critique` prompt returns advisory envelope
+  - live `concise` prompt returns rewrite envelope
 - Verify Corina is discoverable as a primary agent and subagents are hidden/non-editing.
 - Verify a normal authoring prompt does not create or modify files.
 - Verify an explicit save prompt follows the documented edit approval/workspace-safe path where automation can observe it.
@@ -357,6 +366,7 @@ Current integration tests call source-level functions such as `runDraftWithArtif
 **Acceptance Criteria**
 - A fresh checkout can run one documented command that proves OpenCode sees Corina's real agents/tools.
 - Discovery/config smoke can run without model/provider credentials.
+- Discovery/config smoke uses OpenCode server endpoints, especially `/agent`, `/experimental/tool/ids`, `/config`, `/mcp`, and `/global/health`, rather than direct source imports.
 - Live tool smoke is opt-in and clearly skipped when credentials or `opencode` are unavailable.
 - Smoke tests fail if a tool file is renamed, omitted, or not registered.
 - Smoke tests fail if `default_agent` points to a missing or subagent definition.
