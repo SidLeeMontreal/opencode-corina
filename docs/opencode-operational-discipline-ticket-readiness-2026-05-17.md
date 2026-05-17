@@ -45,6 +45,15 @@ The ticket direction matches current OpenCode documentation:
 
 Implementation should still validate the repository's actual installed OpenCode version before depending on new schema behavior.
 
+Current repo/runtime facts:
+
+- `opencode` is not installed on this local machine's PATH during this audit.
+- `package-lock.json` currently resolves `@opencode-ai/sdk` and `@opencode-ai/plugin` to `1.4.3`.
+- `npm view` reports current `opencode-ai`, `@opencode-ai/sdk`, and `@opencode-ai/plugin` as `1.15.3` on 2026-05-17.
+- `deploy/openwork-server/Dockerfile` installs `opencode-ai@${OPENCODE_VERSION}`, and the default value is currently `latest`.
+
+This means the repo can drift across OpenCode versions unless implementation pins and verifies the runtime version used for local/plugin and Docker/hosted mode.
+
 References:
 
 - OpenCode config discovery and permissions: https://open-code.ai/en/docs/config
@@ -109,6 +118,38 @@ The tickets rely on current OpenCode behavior for:
 - server endpoints used by OCD-004
 
 The OpenCode docs support these concepts, but implementation still needs a repo-local verification step against the installed OpenCode version used in local plugin mode and hosted Docker mode. Do not merge the permission/config changes on documentation confidence alone.
+
+Accessible version of the decision:
+
+> We need to confirm that the exact OpenCode version we run understands the permission settings we plan to write. Documentation says the settings exist, but the container currently installs `latest`, so tomorrow's runtime could behave differently from today's tests.
+
+Recommended decision:
+
+- Pin the hosted OpenCode CLI version instead of using `latest`.
+- Use one verified OpenCode version for the first implementation pass.
+- Prefer aligning CLI, SDK, and plugin package versions in the same implementation ticket or a small prerequisite ticket.
+- Treat the version as supported only after the smoke harness proves that OpenCode loads the planned permission shapes through its own server endpoints.
+
+Minimum verification recipe:
+
+1. Pick a target OpenCode version, for example the current npm version at implementation time.
+2. Install or run that exact version locally and in the Docker image.
+3. Start `opencode serve` from the repo root.
+4. Call `GET /global/health` and record the reported version.
+5. Call `GET /config` and confirm the hosted/project config accepted the top-level `permission` block.
+6. Call `GET /agent` and confirm Corina and subagents expose the expected permission metadata from agent frontmatter.
+7. Confirm these expected shapes are visible:
+   - primary Corina local/plugin: `edit: ask`, `bash: deny`, explicit `task` allowlist
+   - hosted/headless config: `edit: deny` unless approval is proven, `bash: deny`, no broad `external_directory`
+   - subagents: `edit: deny`, `bash: deny`, hidden/non-mutating
+   - skills, once added: explicit `permission.skill` allowlist/denylist
+8. Add a config contract test or smoke assertion so future version upgrades fail loudly if the shape changes.
+
+Decision outcome:
+
+- If OpenCode loads and reports the expected permission metadata, proceed with OCD-001/OCD-003 implementation on that pinned version.
+- If OpenCode rejects or drops any permission shape, do not guess. Adjust the ticket to the supported schema for that version, or upgrade/pin OpenCode to a version that supports the intended policy.
+- If the endpoint response omits enough metadata to prove the policy, add a lower-level config parsing/lint test as supplemental coverage, but keep OpenCode server smoke as the authority for runtime compatibility.
 
 ### 2. OCD-002 must reconcile trusted config directories with hosted `external_directory: deny`
 
