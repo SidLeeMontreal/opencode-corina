@@ -1,8 +1,8 @@
 {
   "_comment": "Local plugin deps for OpenCode. Run npm install in the repo root first so scripts/ensure-opencode-deps.mjs populates ../deps/.",
   "dependencies": {
-    "@opencode-ai/plugin": "*",
-    "@opencode-ai/sdk": "*",
+    "@opencode-ai/plugin": "1.15.3",
+    "@opencode-ai/sdk": "1.15.3",
     "opencode-model-resolver": "file:../deps/opencode-model-resolver",
     "opencode-text-tools": "file:../deps/opencode-text-tools"
   }

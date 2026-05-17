@@ -29,7 +29,7 @@ fi
 
 if ! command -v opencode >/dev/null 2>&1; then
     log "opencode not found, installing..."
-    npm install -g "opencode-ai@${OPENCODE_VERSION:-latest}" --loglevel=warn
+    npm install -g "opencode-ai@${OPENCODE_VERSION:-1.15.3}" --loglevel=warn
 fi
 if ! command -v openwork-server >/dev/null 2>&1; then
     log "openwork-server not found, installing..."
