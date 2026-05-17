@@ -6,16 +6,16 @@ Status: critical readiness review
 
 ## Verdict
 
-The remediation ticket set is directionally correct and mostly safe to implement, but it is not uniformly implementation-ready.
+The remediation ticket set is directionally correct and now mostly implementation-ready as a specification. The remaining gaps are not missing ticket intent; they are version/schema checks, runtime-target decisions, and a few implementation details that must be resolved while coding.
 
 Use this readiness classification:
 
 | Ticket | Readiness | Reason |
 | --- | --- | --- |
-| OCD-001 | Ready with one schema/config verification step | The policy decision is now clear, but implementation must validate the exact OpenCode permission shape used in hosted config before merging. |
-| OCD-002 | Ready, high priority | The codebase already has a resolver, and the remaining work is concrete: route every caller-controlled path through it and pass the active execution root explicitly. |
+| OCD-001 | Ready with validation gates | The policy decision is clear, but implementation must validate the exact OpenCode permission shape and must not use hosted `edit: ask` until approval behavior is proven non-hanging. |
+| OCD-002 | Ready, high priority, with root-policy caveat | The codebase already has a resolver, and the remaining work is concrete. Implementation must reconcile trusted config directories with hosted `external_directory` denial. |
 | OCD-003 | Ready after config/schema verification | The Chrome DevTools MCP decision is resolved: it has been removed from Corina's default hosted config. Remaining work is explicit permission policy and regression coverage. |
-| OCD-004 | Ready after config/schema verification | The provider-free discovery path is now specified using documented OpenCode server endpoints. Live tool smoke remains opt-in because it requires provider credentials. |
+| OCD-004 | Ready with smoke-target caveats | The provider-free discovery path is specified using documented OpenCode server endpoints. Implementation must handle experimental endpoint drift and keep live tool smoke opt-in because it depends on model/tool-routing behavior. |
 | OCD-005 | Ready as a specification | The skill layout and frontmatter contract are clear. The `opencode-smoke` skill must reference the `smoke:opencode` command contract defined by OCD-004 and should be implemented after that command exists in `package.json`. |
 | OCD-006 | Ready as a specification | The scope is now explicit: current implementation covers inline text and path-like local file inputs, while raw multimodal attachment payloads are deferred to a future dedicated capability. |
 
@@ -53,7 +53,7 @@ References:
 - OpenCode agent permission keys and pattern behavior: https://opencode.ai/docs/agents/
 - OpenCode skill layout, frontmatter, naming, and `permission.skill`: https://opencode.ai/docs/skills
 
-## Critical Findings
+## Resolved Decisions
 
 ### 1. OCD-003 Chrome MCP decision is resolved
 
@@ -66,7 +66,7 @@ OCD-003 is now implementation-ready with this policy:
 - future hosted MCP tools must be version-pinned
 - future hosted MCP tools must have permission rules and smoke coverage
 
-### 2. OCD-004 discovery path is resolved
+### 2. OCD-004 provider-free discovery path is resolved
 
 The ticket asks smoke tests to verify registered agents/tools through OpenCode. The documentation now names the provider-free server endpoints to use.
 
@@ -91,7 +91,38 @@ Live tool smoke should be separate and opt-in:
 
 Do not implement provider-free discovery by reading `.opencode` files directly. File reads can be supplemental diagnostics after server endpoint checks fail, but they are not the smoke-test authority.
 
-### 3. OCD-002 is ready, but should force a single execution-root contract
+### 3. OCD-006 scope is resolved
+
+OCD-006 now explicitly covers inline text and path-like local file inputs only. Raw multimodal attachment payloads, OCR, screenshot inspection, image/PDF upload handling, and binary payload parsing are deferred to a future dedicated capability.
+
+## Remaining Gaps
+
+### 1. OpenCode schema/version verification is still required
+
+The tickets rely on current OpenCode behavior for:
+
+- top-level `permission` config
+- Markdown agent frontmatter permissions
+- `permission.task` allowlists
+- `permission.skill` rules
+- wildcard/pattern permission behavior for future MCP tools
+- server endpoints used by OCD-004
+
+The OpenCode docs support these concepts, but implementation still needs a repo-local verification step against the installed OpenCode version used in local plugin mode and hosted Docker mode. Do not merge the permission/config changes on documentation confidence alone.
+
+### 2. OCD-002 must reconcile trusted config directories with hosted `external_directory: deny`
+
+OCD-002 permits documented trusted config directories such as `~/.config/opencode/corina/rubrics` and `~/.config/opencode/corina/profiles`. OCD-001 and OCD-003 correctly prefer `external_directory: deny` in hosted mode.
+
+Implementation must make this mode-specific:
+
+- local plugin mode may allow narrow user config directories after resolver validation
+- hosted/headless mode should default to workspace-only reads unless a per-session trusted config directory is explicitly mounted and permissioned
+- any trusted directory outside the workspace must be narrow, documented, and tested against OpenCode `external_directory` behavior
+
+Without this reconciliation, implementation could either break legitimate local config files or weaken hosted file isolation.
+
+### 3. OCD-002 should force a single execution-root contract
 
 The ticket says to use the OpenCode tool context directory where available. That is correct, but implementation should make this non-optional at wrapper boundaries.
 
@@ -104,20 +135,58 @@ Recommended implementation contract:
 
 This protects Docker/OpenWork session workdirs and local plugin workspaces at the same time.
 
-### 4. OCD-006 should distinguish path-like inputs from true attachments
+### 4. OCD-004 uses an experimental tool endpoint
 
-The current code accepts string inputs. It can reject `diagram.png` when the user passes a path string, but it does not appear to have a typed attachment input model for raw image/PDF payloads.
+OCD-004 uses `GET /experimental/tool/ids`, which is documented but explicitly experimental. Implementation should:
 
-Before implementation, clarify:
+- treat `/experimental/tool/ids` as the preferred provider-free tool discovery endpoint
+- also inspect `GET /doc` in the smoke harness so failures can report whether the endpoint disappeared or changed shape
+- fail with a clear compatibility message when the endpoint is unavailable, rather than silently falling back to direct file inspection
+- keep the OpenCode version used during validation in the smoke-test output
 
-- current scope: local file paths and text inputs
-- out of scope: binary attachment payloads supplied by a future client protocol
+### 5. Live tool smoke can be flaky unless it is explicitly opt-in and bounded
 
-This prevents an implementer from inventing a new attachment API inside a safety ticket.
+OCD-004 live smoke relies on a model choosing the expected registered tool through `POST /session/:id/message`. That is useful end-to-end validation, but it can be affected by provider availability, model behavior, latency, and prompt routing.
 
-### 5. OCD-001 needs Docker/headless behavior tested before allowing hosted `ask`
+Implementation should:
 
-The ticket now says hosted Docker should use `edit: deny` unless approval is verified. That is the right default.
+- make provider-free discovery smoke the default required smoke
+- keep live tool smoke behind `OPENCODE_LIVE_TOOL_SMOKE=1`
+- add explicit timeouts
+- use narrow prompts that strongly require the target capability
+- distinguish "provider unavailable", "model did not route", and "tool envelope failed" in failure messages
+- avoid making live smoke mandatory in PR CI unless provider credentials and stability are guaranteed
+
+### 6. Docker/OpenWork smoke target must be specified at implementation time
+
+OCD-004 asks for Docker/OpenWork smoke coverage, but the target can differ by deployment layer:
+
+- external nginx/OpenWork surface on `8443`
+- local gateway/internal OpenCode surface on `3001`
+- per-session OpenCode server ports managed by the orchestrator
+
+Implementation must specify which layer each smoke case targets. Recommended split:
+
+- hosted health/API smoke against the external container surface
+- OpenCode discovery smoke against a direct `opencode serve` process in local tests
+- optional Docker internal smoke only when the test harness can discover or request the active session server safely
+
+### 7. Implementation order is inconsistent between documents
+
+The ticket document's "Suggested Implementation Order" lists OCD-003 before OCD-004, while this readiness document recommends OCD-004 provider-free discovery smoke before finishing OCD-003.
+
+Recommended resolution:
+
+- Keep OCD-001 and OCD-002 first.
+- Implement the provider-free part of OCD-004 before completing OCD-003 so hosted permission/config changes have a regression harness.
+- Complete OCD-003 after that harness exists.
+- Then implement OCD-006 and OCD-005.
+
+The ticket document should be updated to match this order or explicitly explain why it differs.
+
+### 8. OCD-001 still needs Docker/headless behavior tested before allowing hosted `ask`
+
+The ticket says hosted Docker should use `edit: deny` unless approval is verified. That is the right default.
 
 Do not implement hosted `edit: ask` until there is a smoke test proving that OpenWork approval prompts can be answered or fail fast through the API. Otherwise explicit save requests could hang hosted calls.
 
@@ -138,6 +207,7 @@ Tests must be updated. The minimum test set for implementation readiness is:
   - traversal path
   - symlink escape
   - trusted rubric/profile path
+  - trusted rubric/profile path when hosted `external_directory` is denied
   - Docker/OpenWork-style session root
   - local plugin workspace root
 
@@ -153,7 +223,9 @@ Tests must be updated. The minimum test set for implementation readiness is:
 
 - OpenCode smoke tests:
   - provider-free discovery/config smoke using `/global/health`, `/config`, `/agent`, `/experimental/tool/ids`, and `/mcp`
+  - compatibility failure path when `/experimental/tool/ids` is unavailable or changes shape
   - opt-in live tool smoke
+  - live smoke timeout and skipped-provider behavior
   - Docker/OpenWork health and no-hang smoke where feasible
 
 - Skill tests:
@@ -175,11 +247,21 @@ The visual policy is a moderate compatibility risk only if implemented as a stri
 
 OCD-006 is now scoped tightly enough for implementation: reject unsafe visual/binary paths and binary-looking files in the existing string/file resolver path, but do not invent a new attachment ingestion API in this ticket.
 
-## Readiness Gate
+## Readiness Gates
 
-Before starting implementation, resolve these gates:
+Before implementation starts, resolve these gates:
 
 1. Confirm the installed OpenCode version accepts the planned `permission` shapes for hosted config and agent frontmatter.
+2. Decide the hosted trusted-config-directory policy for OCD-002: workspace-only by default, or narrow per-session mounted config directories with matching OpenCode permission behavior.
+3. Align the implementation order between the ticket document and this readiness document, or explicitly document that OCD-004 provider-free smoke is a prerequisite for completing OCD-003.
+4. Specify Docker/OpenWork smoke targets: external nginx/OpenWork surface, gateway/internal OpenCode surface, direct `opencode serve`, or a staged combination.
+
+During implementation, enforce these gates:
+
+1. Treat `/experimental/tool/ids` as preferred but version-sensitive; use `/doc` for compatibility diagnostics.
+2. Keep live tool smoke opt-in, timed, and separate from provider-free discovery smoke.
+3. Keep raw multimodal attachment ingestion out of OCD-006.
+4. Do not enable hosted `edit: ask` unless approval behavior is proven non-hanging.
 
 After those gates, the tickets are ready to implement in the proposed order:
 
