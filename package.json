@@ -20,14 +20,15 @@
     "eval:tier2": "node scripts/run-eval.mjs --mode judge --suite ./evals/suites/all.json --format markdown",
     "eval:baseline": "node scripts/run-eval.mjs --mode judge --suite ./evals/suites/all.json --save-baseline",
     "install-corina": "node scripts/install-corina.mjs",
+    "smoke:opencode": "node scripts/smoke-opencode.mjs",
     "deploy:build": "docker build -f deploy/openwork-server/Dockerfile -t opencode-corina-openwork .",
     "deploy:run": "docker run --rm -it -p 8443:8443 -p 3001:3001 --env-file deploy/openwork-server/.env opencode-corina-openwork",
     "deploy:dev": "docker run --rm -it -p 8443:8443 -p 3001:3001 -v \"$PWD:/workspace:ro\" --env-file deploy/openwork-server/.env opencode-corina-openwork",
     "deploy:compose": "docker compose -f deploy/openwork-server/docker-compose.yml up --build"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "^1.4.1",
-    "@opencode-ai/sdk": "^1.4.1",
+    "@opencode-ai/plugin": "1.15.3",
+    "@opencode-ai/sdk": "1.15.3",
     "ajv": "^8.17.1",
     "opencode-model-resolver": "file:deps/opencode-model-resolver",
     "opencode-text-tools": "file:deps/opencode-text-tools"

@@ -62,6 +62,7 @@ Useful follow-up checks:
 
 ```bash
 npm run test:unit
+npm run smoke:opencode
 npm run test:integration
 npm run eval:tier1
 ```
@@ -240,6 +241,16 @@ Why:
 - every file under `tests/integration/` creates an SDK client with `process.env.OPENCODE_URL ?? "http://127.0.0.1:4098"`
 - `src/tool-runtime.ts` uses the same default, with `OPENCODE_BASE_URL` accepted as an alias
 - `scripts/run-eval.mjs` uses the same live endpoint for Tier 2 (`--mode judge`) and compare/baseline runs
+
+### OpenCode provider-free smoke
+
+This command starts short-lived OpenCode servers itself and does not require model/provider credentials:
+
+```bash
+npm run smoke:opencode
+```
+
+It verifies the pinned OpenCode CLI version, checks that OpenCode accepts the planned permission shapes through `/config` and `/agent`, and confirms Corina's repo agents/tools are discoverable through OpenCode server endpoints.
 
 ### Local live integration-test flow
 

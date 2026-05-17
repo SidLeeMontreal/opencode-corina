@@ -30,8 +30,8 @@ Current code confirms the tickets describe real gaps:
 - `src/file-input.ts` already performs root, realpath, size, directory, and symlink-escape checks, so OCD-002 should extend existing code instead of introducing a second resolver.
 - `.opencode/tools/tone.ts` creates an OpenCode client with `context.directory`, but the downstream source runner still calls `resolveTextOrFileInput()` without receiving that directory. OCD-002 correctly needs execution-root propagation, not just resolver hardening.
 - `src/tone-pipeline.ts`, `src/critique-rubric.ts`, and `src/critique-normalizer.ts` still contain direct path lookup/read behavior for tone/profile/rubric paths.
-- `package.json` has no `smoke:opencode` script today, so OCD-004 must add the test harness before `opencode-smoke` can be implemented. OCD-004 should use OpenCode server endpoints for provider-free discovery and keep model-invoking checks opt-in.
-- There is no `.opencode/skills` directory today, so OCD-005 is additive and low-risk. Its specification is ready now, but implementation should follow the `smoke:opencode` command added by OCD-004.
+- `package.json` now has a provider-free `smoke:opencode` script that verifies OpenCode `1.15.3`, planned permission shapes, and repo agent/tool discovery through OpenCode server endpoints.
+- There is no `.opencode/skills` directory today, so OCD-005 is additive and low-risk. Its `opencode-smoke` skill can now reference the existing `smoke:opencode` command.
 
 ## External OpenCode Contract Check
 
@@ -43,16 +43,18 @@ The ticket direction matches current OpenCode documentation:
 - Agent permissions support `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `lsp`, and `skill` as shorthand actions or pattern maps.
 - Skills are discovered at `.opencode/skills/<name>/SKILL.md`, require `name` and `description` frontmatter, and the `name` must match the directory with the regex `^[a-z0-9]+(-[a-z0-9]+)*$`.
 
-Implementation should still validate the repository's actual installed OpenCode version before depending on new schema behavior.
+Implementation should keep validating the repository's installed OpenCode version before depending on new schema behavior during future upgrades.
 
 Current repo/runtime facts:
 
-- `opencode` is not installed on this local machine's PATH during this audit.
-- `package-lock.json` currently resolves `@opencode-ai/sdk` and `@opencode-ai/plugin` to `1.4.3`.
+- `opencode` is installed on this local machine's PATH at `/opt/homebrew/bin/opencode`.
+- `opencode --version` reports `1.15.3`.
+- `package-lock.json` currently resolves `@opencode-ai/sdk` and `@opencode-ai/plugin` to `1.15.3`.
 - `npm view` reports current `opencode-ai`, `@opencode-ai/sdk`, and `@opencode-ai/plugin` as `1.15.3` on 2026-05-17.
-- `deploy/openwork-server/Dockerfile` installs `opencode-ai@${OPENCODE_VERSION}`, and the default value is currently `latest`.
+- `deploy/openwork-server/Dockerfile` now defaults `OPENCODE_VERSION` to `1.15.3`.
+- `deploy/openwork-server/entrypoint.sh` now falls back to `opencode-ai@1.15.3` if `opencode` is missing at runtime.
 
-This means the repo can drift across OpenCode versions unless implementation pins and verifies the runtime version used for local/plugin and Docker/hosted mode.
+This pins the first implementation pass to OpenCode `1.15.3`. Future OpenCode upgrades should update the CLI pin, SDK/plugin packages, lockfile, and smoke expectations together.
 
 References:
 
@@ -106,7 +108,7 @@ OCD-006 now explicitly covers inline text and path-like local file inputs only. 
 
 ## Remaining Gaps
 
-### 1. OpenCode schema/version verification is still required
+### 1. OpenCode schema/version verification is now confirmed for 1.15.3
 
 The tickets rely on current OpenCode behavior for:
 
@@ -117,39 +119,43 @@ The tickets rely on current OpenCode behavior for:
 - wildcard/pattern permission behavior for future MCP tools
 - server endpoints used by OCD-004
 
-The OpenCode docs support these concepts, but implementation still needs a repo-local verification step against the installed OpenCode version used in local plugin mode and hosted Docker mode. Do not merge the permission/config changes on documentation confidence alone.
+The OpenCode docs support these concepts, and the repo now has a provider-free smoke command that verifies them against OpenCode `1.15.3`.
 
 Accessible version of the decision:
 
 > We need to confirm that the exact OpenCode version we run understands the permission settings we plan to write. Documentation says the settings exist, but the container currently installs `latest`, so tomorrow's runtime could behave differently from today's tests.
 
-Recommended decision:
+Resolved decision:
 
-- Pin the hosted OpenCode CLI version instead of using `latest`.
-- Use one verified OpenCode version for the first implementation pass.
-- Prefer aligning CLI, SDK, and plugin package versions in the same implementation ticket or a small prerequisite ticket.
-- Treat the version as supported only after the smoke harness proves that OpenCode loads the planned permission shapes through its own server endpoints.
+- Hosted OpenCode is pinned to `1.15.3` instead of `latest`.
+- Root `@opencode-ai/sdk` and `@opencode-ai/plugin` are aligned to `1.15.3`.
+- `.opencode/package.json` pins `@opencode-ai/sdk` and `@opencode-ai/plugin` to `1.15.3` for local plugin dependency installation.
+- `npm run smoke:opencode` verifies that OpenCode `1.15.3` accepts the planned permission shapes through its own server endpoints.
 
-Minimum verification recipe:
+Current verification command:
 
-1. Pick a target OpenCode version, for example the current npm version at implementation time.
-2. Install or run that exact version locally and in the Docker image.
-3. Start `opencode serve` from the repo root.
-4. Call `GET /global/health` and record the reported version.
-5. Call `GET /config` and confirm the hosted/project config accepted the top-level `permission` block.
-6. Call `GET /agent` and confirm Corina and subagents expose the expected permission metadata from agent frontmatter.
-7. Confirm these expected shapes are visible:
+```bash
+npm run smoke:opencode
+```
+
+What the smoke verifies:
+
+1. `opencode --version` is `1.15.3`.
+2. A temporary permission fixture starts with `opencode serve`.
+3. `GET /global/health` reports version `1.15.3`.
+4. `GET /config` exposes the planned top-level `permission` block.
+5. `GET /agent` exposes the planned agent-frontmatter permission metadata.
+6. The fixture proves these expected shapes are visible:
    - primary Corina local/plugin: `edit: ask`, `bash: deny`, explicit `task` allowlist
    - hosted/headless config: `edit: deny` unless approval is proven, `bash: deny`, no broad `external_directory`
    - subagents: `edit: deny`, `bash: deny`, hidden/non-mutating
    - skills, once added: explicit `permission.skill` allowlist/denylist
-8. Add a config contract test or smoke assertion so future version upgrades fail loudly if the shape changes.
+7. The repo discovery phase verifies Corina and the `draft`, `tone`, `detect`, `critique`, and `concise` tools are visible through OpenCode server endpoints.
 
-Decision outcome:
+Future decision rule:
 
-- If OpenCode loads and reports the expected permission metadata, proceed with OCD-001/OCD-003 implementation on that pinned version.
-- If OpenCode rejects or drops any permission shape, do not guess. Adjust the ticket to the supported schema for that version, or upgrade/pin OpenCode to a version that supports the intended policy.
-- If the endpoint response omits enough metadata to prove the policy, add a lower-level config parsing/lint test as supplemental coverage, but keep OpenCode server smoke as the authority for runtime compatibility.
+- If a future OpenCode upgrade rejects or drops any permission shape, do not guess. Adjust the ticket to the supported schema for that version, or pin OpenCode to a version that supports the intended policy.
+- If endpoint responses stop exposing enough metadata to prove the policy, add a lower-level config parsing/lint test as supplemental coverage, but keep OpenCode server smoke as the authority for runtime compatibility.
 
 ### 2. OCD-002 must reconcile trusted config directories with hosted `external_directory: deny`
 
@@ -292,10 +298,9 @@ OCD-006 is now scoped tightly enough for implementation: reject unsafe visual/bi
 
 Before implementation starts, resolve these gates:
 
-1. Confirm the installed OpenCode version accepts the planned `permission` shapes for hosted config and agent frontmatter.
-2. Decide the hosted trusted-config-directory policy for OCD-002: workspace-only by default, or narrow per-session mounted config directories with matching OpenCode permission behavior.
-3. Align the implementation order between the ticket document and this readiness document, or explicitly document that OCD-004 provider-free smoke is a prerequisite for completing OCD-003.
-4. Specify Docker/OpenWork smoke targets: external nginx/OpenWork surface, gateway/internal OpenCode surface, direct `opencode serve`, or a staged combination.
+1. Decide the hosted trusted-config-directory policy for OCD-002: workspace-only by default, or narrow per-session mounted config directories with matching OpenCode permission behavior.
+2. Align the implementation order between the ticket document and this readiness document, or explicitly document that OCD-004 provider-free smoke is a prerequisite for completing OCD-003.
+3. Specify Docker/OpenWork smoke targets: external nginx/OpenWork surface, gateway/internal OpenCode surface, direct `opencode serve`, or a staged combination.
 
 During implementation, enforce these gates:
 

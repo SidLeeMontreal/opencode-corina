@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd --gid 1001 openwork \
     && useradd --uid 1001 --gid openwork --shell /bin/bash --create-home openwork
 
-ARG OPENCODE_VERSION=latest
+ARG OPENCODE_VERSION=1.15.3
 ARG OPENWORK_SERVER_VERSION=latest
 RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" "openwork-server@${OPENWORK_SERVER_VERSION}" --loglevel=warn \
     && npm install -g @ivotoby/openapi-mcp-server --loglevel=warn \
