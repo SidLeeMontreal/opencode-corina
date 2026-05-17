@@ -330,17 +330,26 @@ Current integration tests call source-level functions such as `runDraftWithArtif
 **Changes**
 - Add a smoke command, for example `npm run smoke:opencode`.
 - Split smoke coverage into two levels:
-  - discovery/config smoke, which does not require a live LLM provider and verifies OpenCode can see the registered agents, tools, plugin, default agent, permissions, and skills
-  - live tool smoke, enabled only when provider credentials are available, which invokes the registered tool surface and checks envelope behavior
+  - discovery/config smoke, which does not require a live LLM provider and verifies OpenCode can see the registered agents, tools, plugin, default agent, permissions, MCP status, and skills where OpenCode exposes them
+  - live tool smoke, enabled only when provider credentials are available, which uses the OpenCode session/message API to prompt Corina through the registered agent/tool surface and checks envelope behavior
 - Start `opencode serve` from the repo root on a test port.
-- Verify `/global/health`.
-- Exercise the registered tool surface through OpenCode, not direct imports.
+- Use documented OpenCode server endpoints for provider-free discovery:
+  - `GET /global/health` to verify the server is healthy
+  - `GET /config` to verify project config loaded, including `default_agent: corina` and permission posture
+  - `GET /agent` to verify Corina and subagents are registered with expected mode/hidden/permission metadata
+  - `GET /experimental/tool/ids` to verify registered tool IDs include `draft`, `tone`, `detect`, `critique`, and `concise`
+  - `GET /mcp` to verify hosted config does not register unexpected MCP servers
+  - `GET /doc` as a fallback contract check when endpoint response shapes change
+- Do not implement discovery smoke by reading `.opencode` files directly. File reads can be used only as supplemental diagnostics after the OpenCode server checks fail.
+- Exercise the registered tool surface through OpenCode server APIs, not direct TypeScript imports.
 - Minimum smoke cases:
-  - `draft` returns the shared envelope
-  - `tone` returns `should_persist=true` on usable rewrite
-  - `detect` returns `should_persist=false`
-  - `critique` returns advisory envelope
-  - `concise` returns rewrite envelope
+  - provider-free discovery confirms `draft`, `tone`, `detect`, `critique`, and `concise` are registered tool IDs
+  - live smoke, when enabled, creates a session with `POST /session`, sends a prompt through `POST /session/:id/message` with `agent: "corina"`, and verifies the returned content has Corina's shared envelope shape
+  - live `draft` prompt returns the shared envelope
+  - live `tone` prompt returns `should_persist=true` on usable rewrite
+  - live `detect` prompt returns `should_persist=false`
+  - live `critique` prompt returns advisory envelope
+  - live `concise` prompt returns rewrite envelope
 - Verify Corina is discoverable as a primary agent and subagents are hidden/non-editing.
 - Verify a normal authoring prompt does not create or modify files.
 - Verify an explicit save prompt follows the documented edit approval/workspace-safe path where automation can observe it.
@@ -357,6 +366,7 @@ Current integration tests call source-level functions such as `runDraftWithArtif
 **Acceptance Criteria**
 - A fresh checkout can run one documented command that proves OpenCode sees Corina's real agents/tools.
 - Discovery/config smoke can run without model/provider credentials.
+- Discovery/config smoke uses OpenCode server endpoints, especially `/agent`, `/experimental/tool/ids`, `/config`, `/mcp`, and `/global/health`, rather than direct source imports.
 - Live tool smoke is opt-in and clearly skipped when credentials or `opencode` are unavailable.
 - Smoke tests fail if a tool file is renamed, omitted, or not registered.
 - Smoke tests fail if `default_agent` points to a missing or subagent definition.
@@ -389,6 +399,9 @@ P3
 
 **Goal**
 Make recurring Corina maintenance workflows discoverable to OpenCode agents through project-local skills.
+
+**Depends on**
+- OCD-004 smoke command contract. OCD-005 is ready as a specification now that OCD-004 defines `npm run smoke:opencode`, but implementation of the `opencode-smoke` skill should happen after the command exists in `package.json`.
 
 **Files**
 - new `.opencode/skills/opencode-smoke/SKILL.md`
@@ -425,6 +438,11 @@ The repo has agents, tools, and a plugin, but no `.opencode/skills/<name>/SKILL.
   ```bash
   OPENCODE_SMOKE=1 npm run smoke:opencode
   ```
+- The `opencode-smoke` skill must describe the OCD-004 smoke workflow:
+  - default provider-free discovery/config smoke
+  - no model/provider credentials required for discovery smoke
+  - opt-in live tool smoke with `OPENCODE_LIVE_TOOL_SMOKE=1`
+  - OpenCode server endpoint checks for `/global/health`, `/config`, `/agent`, `/experimental/tool/ids`, and `/mcp`
 - The `prompt-contract-audit` skill must include:
   ```bash
   npm run test:unit -- tests/unit/prompt-contract.test.ts
@@ -441,6 +459,7 @@ The repo has agents, tools, and a plugin, but no `.opencode/skills/<name>/SKILL.
 
 **Acceptance Criteria**
 - OpenCode can discover the project-local skills from `.opencode/skills`.
+- `opencode-smoke` references the existing `smoke:opencode` command contract from OCD-004 rather than inventing a second smoke workflow.
 - Skill names are valid and stable.
 - Skills do not grant new capabilities by themselves.
 - Hosted config explicitly allows or denies the project skills.
@@ -484,10 +503,13 @@ Avoid silent failures or misleading behavior when users provide images, screensh
 **Problem**
 Corina tools accept string inputs only. There is no explicit policy for visual attachments. A user can reasonably expect screenshots or images to be inspectable, but the tools cannot currently parse visual content.
 
+This ticket covers path-like local file inputs and inline text only. It does not add a typed multimodal attachment API, raw image/PDF upload handling, OCR, screenshot inspection, or binary payload parsing. Those require a separate future capability with an explicit vision/OCR contract.
+
 **Changes**
 - Define policy in README and tool descriptions:
   - supported now: inline text and UTF-8 text files resolved through the safe-root file resolver from OCD-002
   - unsupported now: images, screenshots, PDFs of any kind, videos, slide decks, archives, Office documents, and other binary documents
+  - unsupported now: raw multimodal attachment payloads, because current tools receive string inputs rather than typed attachment objects
   - PDFs are unsupported even when they may contain selectable text, unless their text has already been extracted and provided as plain text
   - expected behavior: return a degraded result explaining that visual/binary inputs must be converted to text first
 - Explicitly supported text extensions:
@@ -507,6 +529,7 @@ Corina tools accept string inputs only. There is no explicit policy for visual a
   - avoid generating a summary from unsupported content
 - Define routing language for future work:
   - accept visual input only in a dedicated capability that explicitly supports vision/OCR
+  - add typed attachment metadata only in that future capability, not as part of this string/file-path safety ticket
   - do not silently summarize, ignore, or embed visual files in current text tools
   - do not pass raw binary content into LLM prompts
 - Add binary/media detection in file resolver:
@@ -518,9 +541,11 @@ Corina tools accept string inputs only. There is no explicit policy for visual a
 - If future image/OCR support is desired, create a separate capability rather than silently overloading existing tools.
 
 **Acceptance Criteria**
+- The implementation scope is documented as inline text and path-like local file inputs only.
 - Passing an image path does not read binary data into prompts.
 - Passing a PDF or binary file returns a clear unsupported-input warning.
 - Passing only a visual attachment produces an actionable unsupported-input result, not an empty success.
+- Raw multimodal attachment payload handling is explicitly out of scope and deferred to a future dedicated capability.
 - Binary content with a fake text extension is rejected by content sniffing.
 - Tool descriptions state what attachment types are supported.
 - Existing text-file support still works.
