@@ -13,9 +13,9 @@ const logger = makeConsoleLogger("detect-tool")
 
 export default tool({
   description:
-    "Detect AI-writing patterns in text. Returns the shared structured envelope by default, with the detection report in artifact, presentation output in rendered, top-level outcome, and should_persist=false. Never rewrites — diagnostic only. All params optional except text.",
+    "Detect AI-writing patterns in text. Returns the shared structured envelope by default, with the detection report in artifact, presentation output in rendered, top-level outcome, and should_persist=false. Never rewrites — diagnostic only. Text may be inline content or a file path inside the active workspace.",
   args: {
-    text: tool.schema.string().describe("Text to analyze or a readable file path."),
+    text: tool.schema.string().describe("Text to analyze or a readable file path inside the active workspace."),
     format: tool.schema.string().optional(),
     autoFix: tool.schema.boolean().optional(),
     chain: tool.schema.string().optional(),

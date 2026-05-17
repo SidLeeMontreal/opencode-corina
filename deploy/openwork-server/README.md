@@ -15,6 +15,7 @@ Runtime details:
 - OpenWork is fronted by nginx on port `8443`
 - OpenCode sessions are managed by the local gateway on port `3001`
 - The OpenAI-compatible proxy is exposed through `/v1/`
+- If `PROXY_API_KEY` is set, `/stats`, `/sessions`, `/opencode/*`, and `/v1/*` require `Authorization: Bearer <PROXY_API_KEY>` or an equivalent basic auth token. `/health` remains unauthenticated for platform probes.
 
 ## Relationship to the plugin
 

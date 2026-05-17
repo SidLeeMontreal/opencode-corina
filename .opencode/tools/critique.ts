@@ -13,9 +13,9 @@ const logger = makeConsoleLogger("critique-tool")
 
 export default tool({
   description:
-    "Critique text quality (quality), evaluate for a specific audience (audience), score against a rubric (rubric), or rank N versions (compare). Returns the shared structured envelope by default, with the critique report in artifact, presentation output in rendered, top-level outcome, and should_persist=false. All params optional — Corina infers missing ones.",
+    "Critique text quality (quality), evaluate for a specific audience (audience), score against a rubric (rubric), or rank N versions (compare). Returns the shared structured envelope by default, with the critique report in artifact, presentation output in rendered, top-level outcome, and should_persist=false. Texts may be inline content or file paths inside the active workspace.",
   args: {
-    texts: tool.schema.array(tool.schema.string()),
+    texts: tool.schema.array(tool.schema.string().describe("Text to critique or a readable file path inside the active workspace.")),
     mode: tool.schema.string().optional(),
     audience: tool.schema.string().optional(),
     rubric: tool.schema.string().optional(),

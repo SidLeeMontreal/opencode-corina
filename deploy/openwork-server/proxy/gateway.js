@@ -30,6 +30,16 @@ function denyHttp(res) {
   res.end(JSON.stringify({ error: { message: "Invalid or missing API key", type: "auth_error" } }));
 }
 
+function isPublicApiRoute(req) {
+  return req.method === "GET" && req.url === "/_health";
+}
+
+function isInternalApiRoute(req) {
+  return req.url === "/_stats"
+    || req.url === "/_sessions"
+    || /^\/_sessions\/[0-9a-f-]+(?:\/pin)?$/.test(req.url);
+}
+
 const ipBindings = new Map();
 const userBindings = new Map();
 const ipLocks = new Map();
@@ -197,7 +207,12 @@ function handleApi(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
-  if (handleApi(req, res)) return;
+  if (isPublicApiRoute(req) && handleApi(req, res)) return;
+
+  if (isInternalApiRoute(req)) {
+    if (!isAuthenticated(req)) return denyHttp(res);
+    if (handleApi(req, res)) return;
+  }
 
   if (!isAuthenticated(req)) return denyHttp(res);
 

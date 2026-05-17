@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename } from "node:path";
 
 import { loadRubric } from "./critique-rubric.js";
+import { resolveTextOrFileInput } from "./file-input.js";
 import type {
   AgentCapabilityOutput,
   CritiqueArtifactUnion,
@@ -95,11 +95,16 @@ function normalizeRawInput(raw: string, index: number, warnings: string[]): Norm
     return null;
   }
 
-  const pathCandidates = [trimmed, resolve(trimmed)];
-  for (const candidate of pathCandidates) {
-    if (!candidate || !existsSync(candidate)) continue;
+  const resolved = resolveTextOrFileInput(trimmed);
+  if (resolved.sourceType === "file") {
+    if (resolved.note) {
+      warnings.push(resolved.note);
+      return null;
+    }
+
+    const candidate = resolved.sourcePath ?? trimmed;
+    const content = resolved.text;
     try {
-      const content = readFileSync(candidate, "utf8");
       if (candidate.endsWith(".json")) {
         const parsed = JSON.parse(content) as unknown;
         if (isAgentCapabilityOutput(parsed)) {
@@ -117,17 +122,18 @@ function normalizeRawInput(raw: string, index: number, warnings: string[]): Norm
         }
       }
 
-      return {
-        id: `item-${index + 1}`,
-        label: basename(candidate),
-        text: content.trim(),
-        source: { kind: "file", path: candidate, text: content.trim() },
-        sourcePath: candidate,
-      };
     } catch {
       warnings.push(`Could not read input file: ${candidate}`);
       return null;
     }
+
+    return {
+      id: `item-${index + 1}`,
+      label: basename(candidate),
+      text: content.trim(),
+      source: { kind: "file", path: candidate, text: content.trim() },
+      sourcePath: candidate,
+    };
   }
 
   if (trimmed.startsWith("{")) {

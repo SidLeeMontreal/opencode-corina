@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { ResolvedRubric, RubricDimension } from "./types.js";
 
-const BUILTIN_RUBRIC_DIR = join(homedir(), ".config", "opencode", "corina", "rubrics");
+const USER_RUBRIC_DIR = join(homedir(), ".config", "opencode", "corina", "rubrics");
+const BUNDLED_RUBRIC_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "rubrics");
 const DEFAULT_RUBRIC_ID = "corina";
 
 interface ParsedDimension {
@@ -103,7 +105,7 @@ function toDimension(input: ParsedDimension | undefined, index: number): RubricD
 }
 
 export function getRubricSearchPaths(): string[] {
-  return [BUILTIN_RUBRIC_DIR];
+  return [USER_RUBRIC_DIR, BUNDLED_RUBRIC_DIR];
 }
 
 function resolveRubricPath(nameOrPath: string): string | null {

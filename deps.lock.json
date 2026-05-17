@@ -1,0 +1,16 @@
+{
+  "repositories": {
+    "opencode-model-resolver": {
+      "url": "https://github.com/SidLeeMontreal/opencode-model-resolver.git",
+      "commit": "384ced607206c4c7e65d5fc5c8c082debbb0af6f"
+    },
+    "opencode-text-tools": {
+      "url": "https://github.com/SidLeeMontreal/opencode-text-tools.git",
+      "commit": "af7d3503b9a8a6666f58d42bf7cb92cbed1cf370"
+    },
+    "opencode-eval-harness": {
+      "url": "https://github.com/SidLeeMontreal/opencode-eval-harness.git",
+      "commit": "43752b5f6fe97abf5b8e1fef071f543e51f52eaa"
+    }
+  }
+}

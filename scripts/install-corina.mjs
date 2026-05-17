@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs"
+import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "fs"
 import { dirname, join, resolve } from "path"
 import { fileURLToPath } from "url"
 
@@ -9,8 +9,9 @@ const installRoot = resolve(process.env.CORINA_INSTALL_ROOT || repoRoot)
 const sourceDir = join(repoRoot, "agents")
 const targetDir = join(installRoot, ".opencode", "agents")
 
-mkdirSync(targetDir, { recursive: true })
 mkdirSync(join(installRoot, ".corina-local", "prompts"), { recursive: true })
+rmSync(targetDir, { recursive: true, force: true })
+mkdirSync(targetDir, { recursive: true })
 cpSync(sourceDir, targetDir, { recursive: true, force: true })
 
 for (const entry of readdirSync(targetDir)) {

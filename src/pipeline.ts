@@ -6,6 +6,16 @@ import { createToolEnvelope } from "./capability-output.js";
 import { deduplicateFindings, normalizeModuleOutput } from "./evaluation-normalizer.js";
 import { buildEvaluationContextFromWorkflowState, selectModules } from "./evaluation-registry.js";
 import { buildEvaluationContextBlock, normalizeBlankLines, runEvaluationAgent } from "./evaluation-runtime.js";
+import {
+  buildContextBlock,
+  contextDeltaFromAuditArtifact,
+  contextDeltaFromBriefArtifact,
+  contextDeltaFromCritiqueArtifact,
+  contextDeltaFromDraftArtifact,
+  contextDeltaFromOutlineArtifact,
+  initializePipelineExecutionContext,
+  mergePipelineExecutionContextDelta,
+} from "./execution-context.js";
 import { createUsageAccumulator, errorDetails, makeConsoleLogger, type AgentLogger } from "./logger.js";
 import { DEFAULT_MODEL_CONFIG } from "./model-config.js";
 import { loadPrompt, voicePromptRelativePath } from "./prompt-loader.js";
@@ -34,6 +44,10 @@ function buildInputSummary(brief: string, state: WorkflowState): string {
 
 function buildCapabilityInputSummary(wordCount: number): string {
   return `Pipeline brief provided (${wordCount} words).`;
+}
+
+function workflowContextBlock(state: WorkflowState): string | undefined {
+  return state.context ? buildContextBlock(state.context) : undefined;
 }
 
 function buildFallbackAudit(note: string, finalContent: string | null = null): AuditArtifact {
@@ -88,7 +102,7 @@ async function runAuditV2(
   const selectedModules = selectModules(context, "auditor");
   const evaluatorModules = selectedModules.filter((module) => module.id !== "auditor-adjudicator");
   const module_status: Partial<Record<EvaluationModuleId, ModuleRunStatus>> = {};
-  const contextBlock = buildEvaluationContextBlock(context);
+  const contextBlock = [workflowContextBlock(state), buildEvaluationContextBlock(context)].filter(Boolean).join("\n\n");
 
   logger.info("evaluation_plan_selected", {
     capability: "pipeline",
@@ -246,15 +260,30 @@ export async function runPipelineWithArtifact(
 ): Promise<CorinaToolEnvelope<DraftToolArtifact>> {
   const startMs = Date.now();
   const usage = createUsageAccumulator();
+  const inputWordCount = brief.trim().split(/\s+/).filter(Boolean).length;
   const state: WorkflowState = {
     briefText: brief,
+    context: initializePipelineExecutionContext({
+      capability: "draft",
+      requestedOperation: "draft",
+      userIntentSummary: brief.trim() ? brief.trim().slice(0, 240) : "Draft content from the provided brief.",
+      sourceMaterialRefs: ["tool-input:brief"],
+      globalInstructions: [
+        "Preserve facts, named entities, dates, numbers, and core claims.",
+        "Do not invent evidence.",
+        "Keep output specific and free of generic AI phrasing.",
+      ],
+      content: {
+        scope: "full_document",
+        word_count: inputWordCount,
+      },
+    }),
     critiquePasses: 0,
     warnings: [],
   };
 
   const config = mergeModelConfig(modelConfig);
   const resolver = new ModelResolver();
-  const inputWordCount = brief.trim().split(/\s+/).filter(Boolean).length;
 
   logger.info("capability_start", {
     capability: "pipeline",
@@ -266,11 +295,12 @@ export async function runPipelineWithArtifact(
   try {
     const briefModel = await resolver.resolveStepModel(config.briefIntake, config.provider);
     const { result: briefResult } = await runStep(logger, "brief_intake", briefModel.modelID, () =>
-      runBriefIntake(client, brief, briefModel, logger, usage),
+      runBriefIntake(client, brief, briefModel, logger, usage, workflowContextBlock(state)),
     );
     state.briefArtifact = briefResult.artifact;
     state.user_constraints = [...(state.briefArtifact.constraints ?? [])];
     state.warnings.push(...(briefResult.warnings ?? []));
+    state.context = mergePipelineExecutionContextDelta(state.context!, contextDeltaFromBriefArtifact(state.briefArtifact));
 
     const briefValidation = validate("BriefArtifact", state.briefArtifact);
     if (!briefValidation.valid) {
@@ -318,10 +348,11 @@ export async function runPipelineWithArtifact(
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const outlineModel = await resolver.resolveStepModel(config.outline, config.provider);
       const { result: outlineResult } = await runStep(logger, "outline", outlineModel.modelID, () =>
-        runOutline(client, state.briefArtifact!, outlineModel, logger, usage),
+        runOutline(client, state.briefArtifact!, outlineModel, logger, usage, workflowContextBlock(state)),
       );
       state.outlineArtifact = outlineResult.artifact;
       state.warnings.push(...(outlineResult.warnings ?? []));
+      state.context = mergePipelineExecutionContextDelta(state.context!, contextDeltaFromOutlineArtifact(state.outlineArtifact));
 
       outlineValidation = validate("OutlineArtifact", state.outlineArtifact);
       if (outlineValidation.valid) {
@@ -342,12 +373,19 @@ export async function runPipelineWithArtifact(
 
     const draftModel = await resolver.resolveStepModel(config.draft, config.provider);
     const { result: draftResult } = await runStep(logger, "draft", draftModel.modelID, () =>
-      runDraftStep(client, state.briefArtifact!, state.outlineArtifact!, draftModel, logger, usage),
+      runDraftStep(client, state.briefArtifact!, state.outlineArtifact!, draftModel, logger, usage, workflowContextBlock(state)),
     );
     state.draftArtifact = draftResult.artifact;
     state.requested_voice = inferVoice(state.draftArtifact.content);
     state.voice_prompt = state.requested_voice ? loadPrompt(voicePromptRelativePath(state.requested_voice)) : undefined;
     state.warnings.push(...(draftResult.warnings ?? []));
+    state.context = mergePipelineExecutionContextDelta(state.context!, {
+      ...contextDeltaFromDraftArtifact(state.draftArtifact),
+      voice: {
+        name: state.requested_voice,
+        profile_ref: state.requested_voice ? voicePromptRelativePath(state.requested_voice) : null,
+      },
+    });
 
     const draftValidation = validate("DraftArtifact", state.draftArtifact);
     if (!draftValidation.valid) {
@@ -358,10 +396,11 @@ export async function runPipelineWithArtifact(
       state.critiquePasses = pass;
       const critiqueModel = await resolver.resolveStepModel(config.critique, config.provider);
       const { result: critiqueResult } = await runStep(logger, "critique", critiqueModel.modelID, () =>
-        runCritique(client, state.draftArtifact!, state.briefArtifact!, critiqueModel, logger, usage),
+        runCritique(client, state.draftArtifact!, state.briefArtifact!, critiqueModel, logger, usage, workflowContextBlock(state)),
       );
       state.critiqueArtifact = critiqueResult.artifact;
       state.warnings.push(...(critiqueResult.warnings ?? []));
+      state.context = mergePipelineExecutionContextDelta(state.context!, contextDeltaFromCritiqueArtifact(state.critiqueArtifact, pass));
 
       const critiqueValidation = validate("CritiqueArtifact", state.critiqueArtifact);
       if (!critiqueValidation.valid) {
@@ -374,10 +413,14 @@ export async function runPipelineWithArtifact(
 
       const reviseModel = await resolver.resolveStepModel(config.revise, config.provider);
       const { result: revisionResult } = await runStep(logger, "revise", reviseModel.modelID, () =>
-        runRevise(client, state.draftArtifact!, state.critiqueArtifact!, reviseModel, logger, usage),
+        runRevise(client, state.draftArtifact!, state.critiqueArtifact!, reviseModel, logger, usage, workflowContextBlock(state)),
       );
       state.draftArtifact = revisionResult.artifact;
       state.warnings.push(...(revisionResult.warnings ?? []));
+      state.context = mergePipelineExecutionContextDelta(state.context!, {
+        ...contextDeltaFromDraftArtifact(state.draftArtifact),
+        step_history: [`revise_pass_${pass}`],
+      });
 
       const revisedDraftValidation = validate("DraftArtifact", state.draftArtifact);
       if (!revisedDraftValidation.valid) {
@@ -389,6 +432,7 @@ export async function runPipelineWithArtifact(
     const auditStartMs = Date.now();
     logger.debug("step_start", { capability: "pipeline", step: "audit", model_id: auditModel.modelID });
     state.auditArtifact = await runAuditV2(client, state, auditModel, logger, usage);
+    state.context = mergePipelineExecutionContextDelta(state.context!, contextDeltaFromAuditArtifact(state.auditArtifact));
     logger.info("step_complete", {
       capability: "pipeline",
       step: "audit",
