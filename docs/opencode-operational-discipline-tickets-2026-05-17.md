@@ -503,10 +503,13 @@ Avoid silent failures or misleading behavior when users provide images, screensh
 **Problem**
 Corina tools accept string inputs only. There is no explicit policy for visual attachments. A user can reasonably expect screenshots or images to be inspectable, but the tools cannot currently parse visual content.
 
+This ticket covers path-like local file inputs and inline text only. It does not add a typed multimodal attachment API, raw image/PDF upload handling, OCR, screenshot inspection, or binary payload parsing. Those require a separate future capability with an explicit vision/OCR contract.
+
 **Changes**
 - Define policy in README and tool descriptions:
   - supported now: inline text and UTF-8 text files resolved through the safe-root file resolver from OCD-002
   - unsupported now: images, screenshots, PDFs of any kind, videos, slide decks, archives, Office documents, and other binary documents
+  - unsupported now: raw multimodal attachment payloads, because current tools receive string inputs rather than typed attachment objects
   - PDFs are unsupported even when they may contain selectable text, unless their text has already been extracted and provided as plain text
   - expected behavior: return a degraded result explaining that visual/binary inputs must be converted to text first
 - Explicitly supported text extensions:
@@ -526,6 +529,7 @@ Corina tools accept string inputs only. There is no explicit policy for visual a
   - avoid generating a summary from unsupported content
 - Define routing language for future work:
   - accept visual input only in a dedicated capability that explicitly supports vision/OCR
+  - add typed attachment metadata only in that future capability, not as part of this string/file-path safety ticket
   - do not silently summarize, ignore, or embed visual files in current text tools
   - do not pass raw binary content into LLM prompts
 - Add binary/media detection in file resolver:
@@ -537,9 +541,11 @@ Corina tools accept string inputs only. There is no explicit policy for visual a
 - If future image/OCR support is desired, create a separate capability rather than silently overloading existing tools.
 
 **Acceptance Criteria**
+- The implementation scope is documented as inline text and path-like local file inputs only.
 - Passing an image path does not read binary data into prompts.
 - Passing a PDF or binary file returns a clear unsupported-input warning.
 - Passing only a visual attachment produces an actionable unsupported-input result, not an empty success.
+- Raw multimodal attachment payload handling is explicitly out of scope and deferred to a future dedicated capability.
 - Binary content with a fake text extension is rejected by content sniffing.
 - Tool descriptions state what attachment types are supported.
 - Existing text-file support still works.

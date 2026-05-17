@@ -17,7 +17,7 @@ Use this readiness classification:
 | OCD-003 | Ready after config/schema verification | The Chrome DevTools MCP decision is resolved: it has been removed from Corina's default hosted config. Remaining work is explicit permission policy and regression coverage. |
 | OCD-004 | Ready after config/schema verification | The provider-free discovery path is now specified using documented OpenCode server endpoints. Live tool smoke remains opt-in because it requires provider credentials. |
 | OCD-005 | Ready as a specification | The skill layout and frontmatter contract are clear. The `opencode-smoke` skill must reference the `smoke:opencode` command contract defined by OCD-004 and should be implemented after that command exists in `package.json`. |
-| OCD-006 | Ready with scope clarification | The binary/text policy is clear for local file paths. It should explicitly say current implementation covers path-like inputs, not true multimodal attachment payloads. |
+| OCD-006 | Ready as a specification | The scope is now explicit: current implementation covers inline text and path-like local file inputs, while raw multimodal attachment payloads are deferred to a future dedicated capability. |
 
 Overall recommendation: implement OCD-001 and OCD-002 first, then OCD-004 provider-free discovery smoke, then finish OCD-003, OCD-006, and OCD-005.
 
@@ -173,12 +173,13 @@ The two highest-risk mistakes are:
 
 The visual policy is a moderate compatibility risk only if implemented as a strict extension allowlist. The current ticket avoids that by allowing any safe UTF-8 text after sniffing, which preserves normal code-repo plugin use.
 
+OCD-006 is now scoped tightly enough for implementation: reject unsafe visual/binary paths and binary-looking files in the existing string/file resolver path, but do not invent a new attachment ingestion API in this ticket.
+
 ## Readiness Gate
 
 Before starting implementation, resolve these gates:
 
 1. Confirm the installed OpenCode version accepts the planned `permission` shapes for hosted config and agent frontmatter.
-2. Clarify in OCD-006 that the initial implementation covers path-like local file inputs, not raw multimodal attachment payloads.
 
 After those gates, the tickets are ready to implement in the proposed order:
 
